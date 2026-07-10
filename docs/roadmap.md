@@ -106,6 +106,7 @@ Recorded as they are made, starting with the clarification rounds at project sta
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
 | Repository license  | MIT                                                           |
 | Docker usage        | Stateful infrastructure only (see below)                      |
+| Interim runtime     | GitHub Codespace (16 vCPU / 32 GB) until a VPS is available; the 8-core/16 GB CPU-only VM stays the design floor — nothing may require more |
 
 > **Assumption:** no RAG frameworks (LangChain/LlamaIndex/Haystack) — primitives are built
 > by hand from plain libraries, because the goal is learning how RAG works internally.

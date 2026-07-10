@@ -8,10 +8,18 @@
   // ── Dev Container Features ────────────────────────────────────────────────
   "features": {
     // Docker-in-Docker for `make db` (Postgres 17 + pgvector via Compose)
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    // Claude Code CLI + VS Code extension (official feature; installs latest CLI)
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
     // Python itself is managed by uv (see .python-version), installed by the
     // postCreateCommand below — no python feature needed.
   },
+
+  // Keep Claude Code auth/settings across container rebuilds (in Codespaces,
+  // ~/.claude survives stop/start but is cleared on rebuild without this).
+  "mounts": [
+    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
 
   // ── Post-create setup ─────────────────────────────────────────────────────
   // Installs uv and syncs Python dependencies. Idempotent.
