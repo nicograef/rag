@@ -1,0 +1,38 @@
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ───────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# ── Data & models ────────────────────────────────────────────────────────────
+# Raw downloads, converted corpus, embeddings, model files — never committed;
+# the pipeline is re-runnable (see docs/roadmap.md).
+data/
+*.gguf
+
+# ── Node (future frontend) ───────────────────────────────────────────────────
+node_modules/
+
+# ── Build artifacts ──────────────────────────────────────────────────────────
+dist/
+build/
+*.exe
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log

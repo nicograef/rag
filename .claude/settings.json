@@ -1,0 +1,9 @@
+{
+  "includeCoAuthoredBy": false,
+  "extraKnownMarketplaces": {
+    "nicograef": {
+      "source": { "source": "github", "repo": "nicograef/handbook" }
+    }
+  },
+  "enabledPlugins": { "handbook@nicograef": true }
+}

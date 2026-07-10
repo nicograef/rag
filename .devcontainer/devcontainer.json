@@ -1,0 +1,36 @@
+// Dev Container configuration — based on handbook templates/devcontainer.json
+// Docs: https://containers.dev/implementors/json_reference/
+{
+  "name": "rag-dev",
+
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+  // ── Dev Container Features ────────────────────────────────────────────────
+  "features": {
+    // Docker-in-Docker for `make db` (Postgres 17 + pgvector via Compose)
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    // Python itself is managed by uv (see .python-version), installed by the
+    // postCreateCommand below — no python feature needed.
+  },
+
+  // ── Post-create setup ─────────────────────────────────────────────────────
+  // Installs uv and syncs Python dependencies. Idempotent.
+  "postCreateCommand": "bash scripts/setup-dev-tools.sh",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "python.defaultInterpreterPath": ".venv/bin/python"
+      },
+      "extensions": [
+        // -- Python --
+        "ms-python.python",
+        "charliermarsh.ruff",
+
+        // -- General --
+        "editorconfig.editorconfig"
+      ]
+    }
+  }
+}
