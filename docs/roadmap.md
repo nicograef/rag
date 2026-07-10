@@ -62,7 +62,9 @@ Goal: embeddings for every chunk, stored and indexed in Postgres.
 Goal: close the loop — ask a legal question in the terminal, get a grounded answer.
 
 - Runtime: **Ollama** (localhost HTTP API) serving an open-weight GGUF model that fits
-  8-core/16 GB CPU (candidate size: 7–8B quantized; pick during the phase).
+  8-core/16 GB CPU (candidate size: 7–8B quantized; pick during the phase). Runs as a
+  second Compose service next to Postgres, models in a named volume (see Docker decision
+  below).
 - Flow: CLI prompt → embed the question (same model as Phase 3) → top-k vector search →
   **prompt assembly** (system instructions + retrieved chunks with citations + question)
   → Ollama → print answer + sources to the terminal.
@@ -92,7 +94,7 @@ Ordered roughly by learning value; each item is its own phase with its own plan:
 
 ## Decisions
 
-Recorded from the clarification rounds at project start (2026-07-10):
+Recorded as they are made, starting with the clarification rounds at project start (2026-07-10):
 
 | Decision            | Choice                                                        |
 | ------------------- | ------------------------------------------------------------- |
@@ -103,9 +105,23 @@ Recorded from the clarification rounds at project start (2026-07-10):
 | LLM runtime (PoC)   | Ollama                                                        |
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
 | Repository license  | MIT                                                           |
+| Docker usage        | Stateful infrastructure only (see below)                      |
 
 > **Assumption:** no RAG frameworks (LangChain/LlamaIndex/Haystack) — primitives are built
 > by hand from plain libraries, because the goal is learning how RAG works internally.
 >
+**Docker usage** (decided 2026-07-10): containers earn their keep for versioned, stateful,
+long-running infrastructure and for deployment — not for code under active development.
+
+- **Postgres + pgvector:** Docker Compose (pinned version, one-command reset).
+- **Ollama:** second Compose service when Phase 4 lands, models in a named volume —
+  the whole serving side becomes one `docker compose up`. No GPU passthrough concerns
+  on a CPU-only target.
+- **Python pipeline:** native via uv, never containerized for development — fast iteration,
+  plain debugging, shared Hugging Face model cache; uv's lockfile + pinned Python already
+  provide the reproducibility.
+- **Future Go/React app:** dockerized at deployment time, following the handbook's
+  Compose/nginx templates.
+
 > **Assumption:** the embedding model is chosen in Phase 3 after researching current model
 > cards (open license, multilingual, CPU-capable) — not fixed now.
