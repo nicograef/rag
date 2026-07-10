@@ -102,11 +102,10 @@ Recorded from the clarification rounds at project start (2026-07-10):
 | Docs language       | English (German only for corpus + domain terms)               |
 | LLM runtime (PoC)   | Ollama                                                        |
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
+| Repository license  | MIT                                                           |
 
 > **Assumption:** no RAG frameworks (LangChain/LlamaIndex/Haystack) — primitives are built
 > by hand from plain libraries, because the goal is learning how RAG works internally.
 >
 > **Assumption:** the embedding model is chosen in Phase 3 after researching current model
 > cards (open license, multilingual, CPU-capable) — not fixed now.
->
-> **Open item:** repository license — not chosen yet.

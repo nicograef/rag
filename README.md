@@ -47,5 +47,5 @@ This repo follows the conventions of [nicograef/handbook](https://github.com/nic
 
 ## License
 
-Not chosen yet (tracked as an open item in [docs/roadmap.md](docs/roadmap.md)).
+MIT — see [LICENSE](LICENSE).
 The ingested law texts are amtliche Werke (§ 5 UrhG) and remain public domain.
