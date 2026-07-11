@@ -15,6 +15,8 @@ devcontainer, CI, handbook conventions (AGENTS.md/CLAUDE.md, plugin adoption).
 
 ## Phase 1 — Fetch & convert (corpus acquisition) ⬜
 
+Stages: **fetch**, **convert**
+
 Goal: a config-driven fetcher that turns official law XML into clean Markdown on disk.
 
 - Download official XML from gesetze-im-internet.de per law
@@ -33,6 +35,8 @@ Goal: a config-driven fetcher that turns official law XML into clean Markdown on
 
 ## Phase 2 — Structure-aware chunking ⬜
 
+Stage: **chunk**
+
 Goal: split the Markdown corpus into retrieval units without destroying legal structure.
 
 - Chunk by **§ (Paragraph)** as the natural semantic unit; split oversized §§ by Absatz
@@ -44,6 +48,8 @@ Goal: split the Markdown corpus into retrieval units without destroying legal st
 - Later candidates (backlog): semantic chunking, hierarchical parent-child chunks.
 
 ## Phase 3 — Embed & load (vector store) ⬜
+
+Stages: **embed**, **load**
 
 Goal: embeddings for every chunk, stored and indexed in Postgres.
 
@@ -58,6 +64,8 @@ Goal: embeddings for every chunk, stored and indexed in Postgres.
   test queries.
 
 ## Phase 4 — Online PoC (CLI question answering) ⬜
+
+Stages: **retrieve**, **assemble**, **generate**
 
 Goal: close the loop — ask a legal question in the terminal, get a grounded answer.
 
@@ -74,7 +82,9 @@ Goal: close the loop — ask a legal question in the terminal, get a grounded an
 
 ## Phase 5+ — Enhancement backlog (one at a time) ⬜
 
-Ordered roughly by learning value; each item is its own phase with its own plan:
+Ordered roughly by learning value; each item is its own phase with its own plan. A backlog
+phase may add or split a stage by amending the PRD's stage taxonomy in the same change; the
+evaluation item lands the cross-cutting **evaluate** harness, not a pipeline stage.
 
 1. **Evaluation first (RAG triad):** a small gold-question set; measure context relevance,
    faithfulness/groundedness, answer relevance — so every later enhancement is measurable.
@@ -129,3 +139,23 @@ long-running infrastructure and for deployment — not for code under active dev
 
 > **Assumption:** the embedding model is chosen in Phase 3 after researching current model
 > cards (open license, multilingual, CPU-capable) — not fixed now.
+
+**Playbook repositioning** (decided 2026-07-11): the repository is a learning project that
+doubles as a public **RAG playbook** — a production-shaped, self-hosted, framework-free
+reference implementation a learner can clone and run — in that order.
+
+- **Context:** the docs addressed one person — no audience statement, no landed-vs-planned
+  status, no support policy — although the existing constraints (open-source only, CPU-only,
+  no frameworks, real public-domain corpus) already match what a framework-free reference
+  needs. The product big picture (audience, promises, pillars, stage taxonomy) is recorded
+  in the [PRD](prds/prd-rag-playbook.md).
+- **Choice:** reposition through a documentation-only rework — README as the learner front
+  door with a status table, stage-annotated roadmap, repositioned agent instructions.
+  Pipeline code untouched; phases continue per this roadmap. Alternatives weighed: keeping
+  the private-learning framing (rejected — the repo is public and the tutorial/framework gap
+  is real); docs tooling or a rendered site (rejected — plain Markdown suffices, see the
+  PRD's "Out of Scope").
+- **Consequences:** every future phase is bound by the definition of done stated in full in
+  [AGENTS.md](../AGENTS.md) (rule 5); the README status table gates every
+  runnable-experience claim; time-sensitive claims carry the date they were last verified;
+  the playbook never claims "state of the art".
