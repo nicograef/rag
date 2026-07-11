@@ -132,18 +132,18 @@ reader-facing prose into it:
 
 ### Acceptance criteria
 
-- [ ] `AGENTS.md` intro describes the repo as a learning project that doubles as a public
+- [x] `AGENTS.md` intro describes the repo as a learning project that doubles as a public
       playbook, names what it is explicitly not, and uses the exact stage taxonomy names
       from this plan's architectural decisions.
-- [ ] The definition of done appears once, in full, in `AGENTS.md`, and nowhere else in
+- [x] The definition of done appears once, in full, in `AGENTS.md`, and nowhere else in
       the repo except as links.
-- [ ] The strengthened verification boundary covers trained knowledge (not only external
+- [x] The strengthened verification boundary covers trained knowledge (not only external
       tools) and requires dating time-sensitive claims.
-- [ ] The theory-chapter convention names `docs/theory/<building-block>.md` and the
+- [x] The theory-chapter convention names `docs/theory/<building-block>.md` and the
       two-way cross-linking rule; no `docs/theory/` directory is created.
-- [ ] `CLAUDE.md` re-read; updated only if positioning language is found (expected: no
+- [x] `CLAUDE.md` re-read; updated only if positioning language is found (expected: no
       change).
-- [ ] No reader-facing (learner) prose added to `AGENTS.md`/`CLAUDE.md`; `make check`
+- [x] No reader-facing (learner) prose added to `AGENTS.md`/`CLAUDE.md`; `make check`
       passes.
 
 ---
@@ -175,12 +175,12 @@ Annotate and record — no reorganization:
 
 ### Acceptance criteria
 
-- [ ] Every roadmap phase (1–5+) names the stage(s) it lands, using the exact taxonomy
+- [x] Every roadmap phase (1–5+) names the stage(s) it lands, using the exact taxonomy
       names; diff shows annotations and the decision entry only — no phase reordered,
       removed, or reworded beyond the annotation.
-- [ ] The decision entry is dated, follows the existing full-block convention, and links
+- [x] The decision entry is dated, follows the existing full-block convention, and links
       to the PRD and to the `AGENTS.md` DoD instead of restating them.
-- [ ] All links in the changed file resolve to existing files/sections; `make check`
+- [x] All links in the changed file resolve to existing files/sections; `make check`
       passes.
 
 ---
@@ -232,16 +232,18 @@ Rewrite `README.md` as the learner front door, in this order:
 
 ### Acceptance criteria
 
-- [ ] README states audience, landed-vs-planned status table (matching
+- [x] README states audience, landed-vs-planned status table (matching
       `docs/roadmap.md` exactly), quick start with today's first-run costs and the gated
       future-downloads note, pipeline overview with all eight stage names + evaluate,
       corpus swap path with its blast radius, and the project-status/no-support
       statement.
-- [ ] No claim in the README promises a runnable experience beyond Phase 0; no
+- [x] No claim in the README promises a runnable experience beyond Phase 0; no
       "state of the art" claim anywhere; time-sensitive statements carry a date.
-- [ ] Reader-facing prose contains no contributor/agent workflow rules — those remain
+- [x] Reader-facing prose contains no contributor/agent workflow rules — those remain
       only a link to `AGENTS.md`.
-- [ ] Every relative link in the README resolves; the status table's stage names match
+- [x] Every relative link in the README resolves; the status table's stage names match
       the taxonomy verbatim; `make check` passes.
-- [ ] Quick start re-verified from a clean checkout and the verification date recorded
-      next to the status table.
+- [x] Quick start re-verified from a clean checkout (2026-07-11) and the date recorded
+      next to the status table; `make db` verified up to the image pull only — the
+      verifying sandbox's network blocked Docker Hub blob downloads (disclosed in the
+      README next to the date).
