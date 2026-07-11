@@ -45,7 +45,7 @@ Goal: split the Markdown corpus into retrieval units without destroying legal st
   URL, fetch date — the basis for later filtering and citations.
 - Learn here: why chunk size matters, recursive character splitting as the baseline,
   and why structure-aware beats fixed-size for law texts.
-- Later candidates (backlog): semantic chunking, hierarchical parent-child chunks.
+- Later candidates: see backlog item 6 (advanced chunking strategies).
 
 ## Phase 3 — Embed & load (vector store) ⬜
 
@@ -58,7 +58,11 @@ Goal: embeddings for every chunk, stored and indexed in Postgres.
   jina-embeddings-de, bge-m3 — decide by German retrieval quality, dimension count, and
   CPU latency; verify against current model cards, not memory).
 - Schema: `chunks` table (text, metadata columns, `vector` column); **HNSW index**
-  (speed/recall trade-off — learn how it works).
+  (speed/recall trade-off — learn how it works). The theory chapter frames HNSW within
+  approximate nearest neighbor search and contrasts IVF and vector quantization (both
+  theory-only — see the [concept map](concepts.md)).
+- The dated model decision pins **embedding normalization** and the pgvector distance
+  operator together with the model choice (verified against the model card).
 - Batch loader: idempotent re-runs (upsert by chunk identity), embedding in batches on CPU.
 - Verify: `SELECT ... ORDER BY embedding <=> query` returns plausible §§ for hand-written
   test queries.
@@ -76,6 +80,12 @@ Goal: close the loop — ask a legal question in the terminal, get a grounded an
 - Flow: CLI prompt → embed the question (same model as Phase 3) → top-k vector search →
   **prompt assembly** (system instructions + retrieved chunks with citations + question)
   → Ollama → print answer + sources to the terminal.
+- The system instructions carry **grounding and abstention directives** ("answer only from
+  the provided §§; say so if they don't contain the answer") — the prompt-level half of
+  hallucination prevention.
+- The phase's generation theory chapter explains CPU inference (prefill vs decode, KV
+  caching, prompt-prefix reuse — why a stable prompt layout is cheap), GGUF weight
+  quantization, and the cost/benefit of chain-of-thought for a small model.
 - Log every step (query, retrieved chunks with scores, final prompt, answer) so failures
   are debuggable — the seed of observability.
 - This is the MVP: offline ingestion + online inference, end to end.
@@ -84,23 +94,63 @@ Goal: close the loop — ask a legal question in the terminal, get a grounded an
 
 Ordered roughly by learning value; each item is its own phase with its own plan. A backlog
 phase may add or split a stage by amending the PRD's stage taxonomy in the same change; the
-evaluation item lands the cross-cutting **evaluate** harness, not a pipeline stage.
+evaluation item lands the cross-cutting **evaluate** harness, not a pipeline stage. The
+[concept map](concepts.md) indexes every concept these items cover — and the concepts
+deliberately left out.
 
-1. **Evaluation first (RAG triad):** a small gold-question set; measure context relevance,
-   faithfulness/groundedness, answer relevance — so every later enhancement is measurable.
+1. **Evaluation first (RAG triad):** a small gold-question set, each question labeled with
+   its expected §§; measure context relevance, faithfulness/groundedness, and answer
+   relevance with a local open-weight LLM judge via Ollama (LLM-as-a-judge,
+   reference-free — built by hand, no RAGAS), plus deterministic rank metrics
+   against the labeled §§ (Recall@K, Precision@K, MRR, NDCG) — so every later enhancement
+   is measurable.
 2. **Hybrid search:** Postgres full-text (BM25-style sparse retrieval) alongside dense
-   vectors; fuse with **Reciprocal Rank Fusion (RRF)**.
-3. **Query transformation:** HyDE, query decomposition, keyword extraction for hard facts
-   (§ numbers, exact terms).
-4. **Cross-encoder reranking** of top-k results (open-source model, CPU).
-5. **Prompt/context-window management:** lost-in-the-middle ordering, token budgets.
-6. **Observability & tracing:** step-level traces (open-source, e.g. Arize Phoenix),
+   vectors; fuse with **Reciprocal Rank Fusion (RRF)**. Theory contrasts lexical sparse
+   retrieval with learned sparse embeddings (SPLADE) and RRF with score
+   normalization / weighted fusion.
+3. **Metadata filtering:** scoped retrieval — filter vector/hybrid search by chunk metadata
+   (law, § number, heading path) via SQL predicates combined with pgvector; learn pre- vs
+   post-filtering and how filters interact with HNSW recall.
+4. **Query transformation:** query rewriting, query expansion (synonyms and domain
+   abbreviations), multi-query retrieval (variants fused via RRF), HyDE, query
+   decomposition — including sequential multi-hop retrieval — keyword extraction for hard
+   facts (§ numbers, exact terms), and a lightweight query router (explicit § citations go
+   to exact metadata lookup). Theory covers step-back prompting as the contrast.
+5. **Cross-encoder reranking** of top-k results (open-source model, CPU). Theory maps the
+   bi-encoder → late-interaction (ColBERT) → cross-encoder spectrum.
+6. **Advanced chunking strategies:** semantic chunking, hierarchical parent-child chunks
+   (Absatz-level children retrieved, §-level parents assembled), contextual chunk
+   enrichment (prepend heading-path/law context; optionally local-LLM chunk summaries),
+   and late chunking if the Phase 3 embedding model exposes token embeddings — each
+   compared against the Phase 2 baseline via the evaluate harness.
+7. **Prompt/context-window management:** lost-in-the-middle ordering, token budgets
+   counted with the served model's own tokenizer. Theory covers the long-context-vs-RAG
+   debate.
+8. **Observability & tracing:** step-level traces (open-source, e.g. Arize Phoenix),
    silent-failure detection.
-7. **Guardrails:** input validation (prompt injection), output checks (groundedness, PII).
-8. **Docling ingestion path** for messy PDF sources (layout analysis, tables) — a second
-   connector proving the pipeline's interfaces.
-9. **Drift detection:** embedding drift monitoring after model or corpus updates.
-10. **Chat web app:** Go backend + React frontend on top of the proven pipeline.
+9. **Guardrails:** input validation (prompt injection), retrieval rails (score thresholds
+   drop weak chunks before assembly), output checks (a CoVe-style groundedness self-check
+   with the local LLM, and PII). Theory covers the full rails taxonomy, including dialog
+   rails and ingestion-time PII handling (this corpus contains none).
+10. **Iterative / agentic retrieval loop:** a hand-built plan → retrieve → reflect loop
+    where the local LLM decides follow-up searches and when it can answer, with CRAG-style
+    self-correction (corpus-internal — no web-search fallback). Theory places Self-RAG on
+    the same spectrum.
+11. **Graph-augmented retrieval (GraphRAG):** extract the explicit §-to-§ and law-to-law
+    citation links into a lightweight graph (plain Postgres tables, no graph database) and
+    expand retrieval hits with their graph neighbors. Theory contrasts full
+    LLM-entity-extraction GraphRAG and its CPU cost.
+12. **Docling ingestion path** for messy PDF sources — a second connector proving the
+    pipeline's interfaces: layout analysis, reading order, tables, page-level chunking with
+    page-number citations, and a dated scoping decision on figures/images. Theory covers
+    classic OCR + layout analysis vs end-to-end document-intelligence VLMs.
+13. **Incremental ingestion:** detect changed laws (XML builddate or content hash) and
+    reprocess only those through convert → chunk → embed → load, skipping unchanged chunks
+    at the upsert boundary.
+14. **Drift detection:** embedding drift monitoring after model or corpus updates —
+    amended laws are this corpus's real drift trigger; the gold-set metrics from item 1
+    are the signal.
+15. **Chat web app:** Go backend + React frontend on top of the proven pipeline.
 
 ## Decisions
 
@@ -159,3 +209,26 @@ reference implementation a learner can clone and run — in that order.
   [AGENTS.md](../AGENTS.md) (rule 5); the README status table gates every
   runnable-experience claim; time-sensitive claims carry the date they were last verified;
   the playbook never claims "state of the art".
+
+**Concept coverage map** (decided 2026-07-11): the playbook tracks the RAG concept space
+explicitly instead of implicitly.
+
+- **Context:** a comprehensive external list of RAG concepts (ingestion → chunking →
+  vectorization → retrieval → query transformation → generation → guardrails → evaluation →
+  advanced architectures) was audited against the repo. Most core concepts already had a
+  home, but several techniques (metadata filtering, advanced chunking, agentic/corrective
+  retrieval, graph-augmented retrieval, incremental ingestion, rank-based retrieval
+  metrics, …) had none, and nothing recorded what is deliberately out of scope.
+- **Choice:** a concept map at [concepts.md](concepts.md) — the project's ubiquitous
+  language: every tracked concept with a one-line definition and its place (core phase,
+  backlog item, theory chapter, glossary, or out of scope with rationale). The backlog grew
+  from 10 to 15 items and was renumbered (the chat web app stays last); existing items
+  gained explicit technique lists. Alternatives weighed: writing the theory chapters now
+  (rejected — theory stays next to the code that lands it, per AGENTS.md); folding
+  everything into backlog prose (rejected — definitions and out-of-scope rationale would
+  drown the plan).
+- **Consequences:** the map is the index, the roadmap wording is the commitment, and theory
+  chapters remain the single place a concept is explained. When a phase or backlog change
+  adds, moves, or drops a concept, the map is updated in the same change. Out-of-scope
+  entries (CDC, chunk-level permissions, multimodal embeddings, human-feedback loops, …)
+  are recorded with rationale so they are decisions, not omissions.

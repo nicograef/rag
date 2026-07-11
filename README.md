@@ -87,6 +87,9 @@ set plus a pinned configuration in, a dated metrics report out.
 
 Each stage's precise contract and its theory chapter (`docs/theory/<building-block>.md`)
 land with the phase that implements it — see the status table above for what exists today.
+The [concept map](docs/concepts.md) indexes every RAG concept the playbook tracks — a
+one-line definition each, plus where it lives: a phase, a backlog item, a theory chapter,
+or a recorded reason it is deliberately out of scope.
 
 ## The corpus — and swapping it
 
@@ -117,6 +120,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `src/rag/`           | Pipeline source code (one subpackage per stage as phases land)   |
 | `tests/`             | pytest suites                                                    |
 | `docs/roadmap.md`    | Phased plan, dated decisions log, enhancement backlog            |
+| `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
 | `docs/prds/`         | Product big picture (the playbook PRD)                           |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |

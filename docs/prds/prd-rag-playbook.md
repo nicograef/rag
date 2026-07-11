@@ -169,6 +169,9 @@ corpus actually requires.
 - Theory chapters: one concise chapter per building block in the docs area, written in
   the same phase as the code, cross-linked from module docstrings and the README pipeline
   overview. No duplication — a concept is explained exactly once.
+- Concept map (`docs/concepts.md`): the ubiquitous language — every tracked RAG concept,
+  defined once, with its place in the playbook. Its maintenance convention is stated in the
+  map itself and recorded in the roadmap's 2026-07-11 concept-coverage decision.
 - Contributor/agent instructions stay in their own files, never leak into reader docs,
   and are updated by the rework to the new positioning.
 - Definition of done for every future phase grows to: code + tests + theory chapter +

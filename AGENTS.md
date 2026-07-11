@@ -102,6 +102,11 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
   cross-linked both ways: module docstrings and the README pipeline overview link to the
   chapter, the chapter links back to the code. A concept is explained exactly once —
   never as code-comment noise. (`docs/theory/` is created when the first chapter lands.)
+- **Concept map as ubiquitous language.** [docs/concepts.md](docs/concepts.md) lists every
+  RAG concept the playbook tracks — one-line definition plus its place (phase, backlog
+  item, theory chapter, glossary, or out of scope with rationale). Use exactly these names
+  in docs, code, and commits; update the map in the same change that adds, moves, or drops
+  a concept.
 - **Small increments.** Prefer several reviewable steps over one big drop; the developer
   reads every diff to learn from it.
 - **Simple over clever.** Explicit code beats abstractions; no premature generality.
