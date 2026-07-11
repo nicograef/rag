@@ -13,13 +13,16 @@ setup:         ## Install dependencies into .venv (uv sync)
 
 # ── Code Quality ──
 
-.PHONY: check lint fmt test
+.PHONY: check lint fmt typecheck test
 
-check: lint test  ## Run all checks (lint + tests)
+check: lint typecheck test  ## Run all checks (lint + types + tests)
 
 lint:          ## ruff: lint + verify formatting
 	uv run ruff check .
 	uv run ruff format --check .
+
+typecheck:     ## ty: static type checking
+	uv run ty check
 
 fmt:           ## ruff: format + autofix lint findings
 	uv run ruff format .

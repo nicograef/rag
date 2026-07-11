@@ -94,7 +94,10 @@ Ordered roughly by learning value; each item is its own phase with its own plan:
 
 ## Decisions
 
-Recorded as they are made, starting with the clarification rounds at project start (2026-07-10):
+Recorded as they are made, starting with the clarification rounds at project start (2026-07-10).
+Convention: a decision that binds future work or makes a deliberate exception gets a dated entry
+with its reasoning — context, choice, weighed alternatives, consequences — like the Docker block
+below; trivial choices stay one-line table rows.
 
 | Decision            | Choice                                                        |
 | ------------------- | ------------------------------------------------------------- |

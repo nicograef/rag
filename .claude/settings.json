@@ -5,5 +5,19 @@
       "source": { "source": "github", "repo": "nicograef/handbook" }
     }
   },
-  "enabledPlugins": { "handbook@nicograef": true }
+  "enabledPlugins": { "handbook@nicograef": true },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // empty' | { read -r f; [ -z \"$f\" ] && exit 0; case \"$f\" in *.py) uv run ruff format \"$f\";; esac; } 2>/dev/null || true",
+            "statusMessage": "Formatting…"
+          }
+        ]
+      }
+    ]
+  }
 }

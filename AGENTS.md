@@ -34,8 +34,9 @@ All commands via Makefile in the project root (`make help` for the full list).
 | Command         | Description                                    |
 | --------------- | ---------------------------------------------- |
 | `make setup`    | Install dependencies (`uv sync`)               |
-| `make check`    | Lint + tests (run before claiming work done)   |
+| `make check`    | Lint + types + tests (run before claiming work done) |
 | `make lint`     | ruff check + format check                      |
+| `make typecheck`| ty static type checking                        |
 | `make fmt`      | ruff format + autofix                          |
 | `make test`     | pytest                                         |
 | `make db`       | Start Postgres 17 + pgvector container         |
@@ -108,7 +109,7 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 
 ## Quality Principles
 
-- **Quality over quantity, correctness over speed.** Fewer, correct changes beat many fast changes.
+- **Correctness and simplicity are decisive; effort is never a counter-argument.** Correctness, simplicity, code quality, and consistency decide every change; effort, time, and work volume are deliberately subordinate — never a valid argument against the correct, simple, clean solution. "Work volume" means effort, not scope: the scope guard below stays — no unrequested features, no gold-plating.
 - **Human-reviewable changes.** Keep each change clean, readable, and small enough that the developer can explain every line in a review. One logical concept per step; mechanical bulk changes (renames, dependency updates) are exempt.
 - **Scope guard.** If a change would go outside the task scope, stop, name the out-of-scope change, and ask before proceeding.
 - **Verify before claiming done.** Before reporting work complete, run the relevant test/lint/build command this turn and cite its result; re-read any document artifact and confirm its links and paths exist.
