@@ -3,16 +3,20 @@
 
 # Agent Instructions — rag
 
-A **learning project**: build a production-grade Retrieval-Augmented Generation (RAG) system
-over German law texts, from first principles. Offline ingestion pipeline in Python
-(fetch → convert → chunk → embed → load into Postgres/pgvector), online retrieval + generation
-with a local open-weight LLM via Ollama. The developer (Nico) is a senior fullstack engineer
-(TypeScript, React, Node, Go, Postgres, Docker, AWS) but **new to AI/LLM/RAG** — the point of
-this repo is understanding every moving part, not shipping fast.
+A **learning project that doubles as a public RAG playbook — in that order**: a
+production-shaped, self-hosted, framework-free reference implementation of
+Retrieval-Augmented Generation (RAG) over German federal law texts, built from first
+principles. Offline ingestion pipeline in Python — **fetch → convert → chunk → embed →
+load** into Postgres/pgvector; online path — **retrieve → assemble → generate** with a
+local open-weight LLM via Ollama; **evaluate** is a cross-cutting harness, not a stage.
+The developer (Nico) is a senior fullstack engineer (TypeScript, React, Node, Go, Postgres,
+Docker, AWS) but **new to AI/LLM/RAG** — the point of this repo is understanding every
+moving part, not shipping fast.
 
-Explicitly NOT: a product, a hosted service, cloud LLM APIs, GPU workloads, proprietary
-models or tools. See [docs/roadmap.md](docs/roadmap.md) for the phased plan and all
-recorded decisions.
+Explicitly NOT: a product, a hosted service, or a supported product — no cloud LLM APIs,
+GPU workloads, proprietary models or tools. See [docs/roadmap.md](docs/roadmap.md) for the
+phased plan and all recorded decisions;
+[docs/prds/prd-rag-playbook.md](docs/prds/prd-rag-playbook.md) holds the product big picture.
 
 ## Tech Stack
 
@@ -80,7 +84,9 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
    Law texts from gesetze-im-internet.de are amtliche Werke (§ 5 UrhG) — public domain.
 4. **Python for all pipeline code.** Go/React are reserved for the future web app.
 5. **One feature at a time** — follow [docs/roadmap.md](docs/roadmap.md) phase by phase;
-   never skip ahead or bundle phases.
+   never skip ahead or bundle phases. **Definition of done** for every future roadmap
+   phase: code + tests + theory chapter + documented stage contract + updated README
+   status with verification date. A phase is not complete until all five have landed.
 6. **No RAG frameworks** (LangChain, LlamaIndex, Haystack). Build the primitives by hand
    from plain libraries — the goal is learning how RAG works internally.
 7. **No data artifacts in git.** `data/` is gitignored; every pipeline stage must be
@@ -90,9 +96,12 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 
 ## Learning
 
-- **Explain while building.** When a phase introduces a new concept (embeddings, HNSW,
-  BM25, RRF, cross-encoders, RAG triad …), explain what it is and why it's needed —
-  in the summary or in `docs/`, not as code-comment noise.
+- **Theory next to code.** Every building block a phase introduces (chunking, embeddings,
+  HNSW, BM25, RRF, cross-encoders, RAG triad …) gets a concise theory chapter at
+  `docs/theory/<building-block>.md`, written in the same phase as the code and
+  cross-linked both ways: module docstrings and the README pipeline overview link to the
+  chapter, the chapter links back to the code. A concept is explained exactly once —
+  never as code-comment noise. (`docs/theory/` is created when the first chapter lands.)
 - **Small increments.** Prefer several reviewable steps over one big drop; the developer
   reads every diff to learn from it.
 - **Simple over clever.** Explicit code beats abstractions; no premature generality.
@@ -101,7 +110,7 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 
 - ✅ **Always:** Verify before claiming — search the codebase before making assertions about existing code, structure, or behaviour. Never guess what a file contains or how something works — read the actual source.
 - ✅ **Always:** Ask instead of assuming — when uncertain about requirements, design intent, or user expectations, ask structured questions to clarify. Only proceed with documented assumptions if the user explicitly declines to answer.
-- ✅ **Always:** Web search for external knowledge — when working with external tools, libraries, specs, or model choices, consult authoritative sources (official docs, papers, model cards) instead of relying on training data.
+- ✅ **Always:** Verify trained knowledge — before relying on trained knowledge of any kind (external tools, libraries, specs, model choices, versions, prices, dates), verify it against current authoritative public sources (official docs, model cards, papers, primary sources); never assert time-sensitive facts from memory, and date every time-sensitive claim.
 - ✅ **Always:** Run `make check` before reporting work complete and cite the result.
 - ⚠️ **Ask first:** new dependencies, changes to Docker/Compose config, adding a new corpus source.
 - 🚫 **Never:** commit anything under `data/`, secrets, or credentials.
