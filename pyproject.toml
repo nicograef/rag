@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Learning project: a RAG system over German law texts, built from first principles"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+]
 
 [dependency-groups]
 dev = [

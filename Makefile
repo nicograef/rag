@@ -11,6 +11,13 @@ export
 setup:         ## Install dependencies into .venv (uv sync)
 	uv sync
 
+# ── Pipeline (offline ingestion) ──
+
+.PHONY: fetch
+
+fetch:         ## Download law XML from gesetze-im-internet.de into data/raw/
+	uv run python -m rag.fetch
+
 # ── Code Quality ──
 
 .PHONY: check lint fmt typecheck test

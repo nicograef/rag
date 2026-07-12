@@ -232,3 +232,34 @@ explicitly instead of implicitly.
   adds, moves, or drops a concept, the map is updated in the same change. Out-of-scope
   entries (CDC, chunk-level permissions, multimodal embeddings, human-feedback loops, …)
   are recorded with rationale so they are decisions, not omissions.
+
+**Corpus licensing — gesetze-im-internet.de** (verified live 2026-07-12): only the
+normative law texts enter the corpus; footnotes and editorial apparatus stay out.
+
+- **Context:** Phase 1's fetch stage ingests XML from gesetze-im-internet.de, and rule 3
+  in [AGENTS.md](../AGENTS.md) demands that only public-domain or properly licensed
+  sources enter the corpus. The licensing facts had so far been asserted from memory and
+  a mirror; this entry pins them from the live site.
+- **Facts (all verified live 2026-07-12):** the site's start page states: „Die
+  Rechtsnormen in deutscher Sprache stehen in allen angebotenen Formaten zur freien
+  Nutzung und Weiterverwendung zur Verfügung." (<https://www.gesetze-im-internet.de/> —
+  note the wording differs slightly from the often-cited „in ihrer deutschsprachigen
+  Fassung" variant). The statutory basis is § 5 Abs. 1 UrhG: „Gesetze, Verordnungen,
+  amtliche Erlasse und Bekanntmachungen sowie Entscheidungen und amtlich verfaßte
+  Leitsätze zu Entscheidungen genießen keinen urheberrechtlichen Schutz."
+  (<https://www.gesetze-im-internet.de/urhg/__5.html>). The Hinweise page (section 6,
+  „Download und Weiterverwertung der Normen") documents the XML offering and its DTD
+  (`/dtd/1.01/gii-norm.dtd`) and adds no further licence terms. The download URLs of all
+  four MVP laws respond and contain the expected GiI-Norm XML (`make fetch` run live the
+  same day).
+- **Choice:** the corpus may include the **normative texts** — norm headings and body
+  text of the German-language laws. **Footnotes (`<fussnoten>`) and editorial apparatus
+  (`<standangabe>`, status notes) are excluded**: they are editorial additions of the
+  Dokumentationsstelle, covered neither clearly by § 5 Abs. 1 UrhG („Gesetze,
+  Verordnungen …") nor unambiguously by the free-reuse statement („Die Rechtsnormen …"),
+  so the conservative reading wins.
+- **Consequences:** convert emits normative text only; the README's licensing wording
+  (amtliche Werke, § 5 UrhG, public domain) is confirmed unchanged; the
+  [fetch contract](stages/fetch.md) links here as its licensing basis. If a future
+  source's terms are less clear, it does not enter the corpus (rule: never ingest
+  sources with unclear licensing).

@@ -161,21 +161,21 @@ idempotent re-run, and error behaviour (HTTP error → non-zero exit, other laws
 
 ### Acceptance criteria
 
-- [ ] `make fetch` downloads all four MVP laws into `data/raw/<slug>/` with `fetch.json`,
+- [x] `make fetch` downloads all four MVP laws into `data/raw/<slug>/` with `fetch.json`,
       verified **live** (URLs respond, zips contain the expected XML), and the live check
       is recorded with its date in the roadmap decision entry.
-- [ ] Re-running `make fetch` is idempotent: directories are cleanly replaced, no stale
+- [x] Re-running `make fetch` is idempotent: directories are cleanly replaced, no stale
       files survive, and an interrupted or failed law leaves other laws' artifacts intact.
-- [ ] Contract tests pass without network access (`httpx.MockTransport` + fixture zip)
+- [x] Contract tests pass without network access (`httpx.MockTransport` + fixture zip)
       and `make check` is green.
-- [ ] `docs/stages/fetch.md` documents input, output artifact incl. the `fetch.json`
+- [x] `docs/stages/fetch.md` documents input, output artifact incl. the `fetch.json`
       schema, invocation, idempotence guarantee (explicitly *not* determinism), and what
       downstream consumes.
-- [ ] The dated licensing decision entry is in the roadmap: live-verified quote of the
+- [x] The dated licensing decision entry is in the roadmap: live-verified quote of the
       free-reuse statement, § 5 Abs. 1 UrhG basis, and what convert may include
       (normative text; footnotes/editorial apparatus only if covered).
-- [ ] `src/rag/__init__.py`'s docstring names the stage taxonomy correctly.
-- [ ] `httpx` is declared in `pyproject.toml` with the lockfile updated.
+- [x] `src/rag/__init__.py`'s docstring names the stage taxonomy correctly.
+- [x] `httpx` is declared in `pyproject.toml` with the lockfile updated.
 
 ---
 
