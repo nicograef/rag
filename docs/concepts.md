@@ -39,13 +39,13 @@ in the same change.
 
 | Concept | Definition | Place |
 | ------- | ---------- | ----- |
-| Fixed-size chunking | Splitting text into chunks of a fixed character or token count, regardless of content or structure. | Theory — chunking chapter (Phase 2), as the baseline structure-aware chunking beats. |
-| Recursive character splitting | Hierarchically splitting on an ordered separator list — paragraphs, then sentences, then words — until every piece fits the size limit. | Theory — chunking chapter (Phase 2), as the standard tutorial baseline. |
+| Fixed-size chunking | Splitting text into chunks of a fixed character or token count, regardless of content or structure. | Theory — [chunking chapter](theory/chunking.md) (Phase 2), as the baseline structure-aware chunking beats. |
+| Recursive character splitting | Hierarchically splitting on an ordered separator list — paragraphs, then sentences, then words — until every piece fits the size limit. | Theory — [chunking chapter](theory/chunking.md) (Phase 2), as the standard tutorial baseline. |
 | Semantic chunking | Splitting where embedding similarity between adjacent sentences drops, so each chunk covers one coherent topic. | Backlog 6. |
-| Sliding window / overlap | Making adjacent chunks share overlapping text so information on a chunk boundary is not lost to retrieval. | Phase 2 — oversized §§ are split by Absatz with overlap. |
+| Sliding window / overlap | Making adjacent chunks share overlapping text so information on a chunk boundary is not lost to retrieval. | [Phase 2](theory/chunking.md) — oversized §§ are split by Absatz with overlap. |
 | Hierarchical (parent-child) chunking | Indexing small child chunks for precise search while handing their larger parents to the LLM for fuller context. | Backlog 6. |
 | Page-level chunking | Using the physical page (typically of a PDF) as the chunk unit, with page numbers as natural citation anchors. | Backlog 12 — pages don't exist in the XML corpus. |
-| Structure-aware / element-based chunking | Splitting a document along its own structural elements (sections, headings, paragraphs, tables, lists) instead of at arbitrary positions. | Phase 2 — the phase itself: chunk by §, split by Absatz, heading-path metadata. |
+| Structure-aware / element-based chunking | Splitting a document along its own structural elements (sections, headings, paragraphs, tables, lists) instead of at arbitrary positions. | [Phase 2](theory/chunking.md) — the phase itself: chunk by §, split by Absatz, heading-path metadata. |
 | Code-aware chunking | Splitting source code along syntactic units (functions, classes) derived from the AST rather than by lines. | Glossary — the code-corpus analogue of structure-aware chunking; this playbook has no code corpus. |
 | Contextual enrichment | Prepending document-level context (heading path or an LLM-generated situating summary) to each chunk before embedding, so it is retrievable in isolation. | Backlog 6 — Phase 2's metadata fields are the raw material. |
 | Late chunking | Embedding a long window with a long-context model first, then pooling token embeddings into per-chunk vectors that retain whole-document context. | Backlog 6, conditional on the Phase 3 model exposing token embeddings and a long context. |

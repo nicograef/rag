@@ -33,7 +33,7 @@ Goal: a config-driven fetcher that turns official law XML into clean Markdown on
 - Verify: re-runnable from clean checkout; deterministic output; unit tests on the
   XML → Markdown converter with a small fixture.
 
-## Phase 2 — Structure-aware chunking ⬜
+## Phase 2 — Structure-aware chunking ✅
 
 Stage: **chunk**
 

@@ -29,17 +29,17 @@ in the [roadmap](docs/roadmap.md).
 | ------------------------------------ | --------------------------------------- | ------ |
 | 0 — Scaffold                         | — (repo, tooling, database)             | ✅     |
 | 1 — Fetch & convert                  | fetch, convert                          | ✅     |
-| 2 — Structure-aware chunking         | chunk                                   | ⬜     |
+| 2 — Structure-aware chunking         | chunk                                   | ✅     |
 | 3 — Embed & load                     | embed, load                             | ⬜     |
 | 4 — Online PoC                       | retrieve, assemble, generate            | ⬜     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
 Quick start last verified from a clean checkout: **2026-07-12** (all steps, including the
-`make db` image download and a live `make fetch && make convert`).
+`make db` image download and a live `make fetch && make convert && make chunk`).
 
 ## Quick start
 
-What runs today (Phases 0–1): the dev setup, the checks, the database, and the first two
+What runs today (Phases 0–2): the dev setup, the checks, the database, and the first three
 pipeline stages.
 
 ```bash
@@ -49,6 +49,7 @@ make db                           # start Postgres 17 + pgvector (Docker Compose
 make check                        # lint + types + tests
 make fetch                        # download the law XML (~0.4 MB) into data/raw/
 make convert                      # convert it into Markdown under data/corpus/
+make chunk                        # slice the corpus into JSONL chunks under data/chunks/
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
@@ -72,7 +73,7 @@ on disk or database state:
 | ----------- | ------------------------------- | ------------------------------------------------ |
 | **[fetch](docs/stages/fetch.md)**     | acquire the source      | source → raw files (official law XML) |
 | **[convert](docs/stages/convert.md)** | make the source workable | raw files → clean Markdown corpus    |
-| **chunk**   | slice into retrieval units      | corpus → chunk records with metadata             |
+| **[chunk](docs/stages/chunk.md)**     | slice into retrieval units | corpus → chunk records with metadata  |
 | **embed**   | turn text into vectors          | chunk records → vectors                          |
 | **load**    | own the database (incl. schema and indexes) | chunk records + vectors → database   |
 
@@ -90,11 +91,13 @@ assembled prompt, answer):
 set plus a pinned configuration in, a dated metrics report out.
 
 Each stage's precise contract (`docs/stages/<stage>.md`) and its theory chapter
-(`docs/theory/<building-block>.md`) land with the phase that implements it — fetch and
-convert's contracts are linked above, and their chapter,
+(`docs/theory/<building-block>.md`) land with the phase that implements it — fetch,
+convert, and chunk's contracts are linked above. The Phase 1 chapter,
 [corpus & parsing](docs/theory/corpus-and-parsing.md), explains why corpus choice,
-licensing, and lossless parsing are RAG decisions. See the status table above for what
-exists today.
+licensing, and lossless parsing are RAG decisions; the Phase 2 chapter,
+[chunking](docs/theory/chunking.md), explains why chunk size matters and why
+structure-aware chunking beats fixed-size splitting for law texts. See the status table
+above for what exists today.
 The [concept map](docs/concepts.md) indexes every RAG concept the playbook tracks — a
 one-line definition each, plus where it lives: a phase, a backlog item, a theory chapter,
 or a recorded reason it is deliberately out of scope.
@@ -137,7 +140,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/prds/`         | Product big picture (the playbook PRD)                           |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
-| `data/`              | Raw downloads, corpus, artifacts — gitignored, re-runnable       |
+| `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`) — gitignored, re-runnable |
 | `laws.toml`          | Corpus config: one entry per law to fetch                        |
 | `docker-compose.yml` | Postgres 17 + pgvector dev stack                                 |
 | `Makefile`           | Dev interface (`make help`)                                      |

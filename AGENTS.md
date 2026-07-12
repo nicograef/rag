@@ -40,6 +40,7 @@ All commands via Makefile in the project root (`make help` for the full list).
 | `make setup`    | Install dependencies (`uv sync`)               |
 | `make fetch`    | Download law XML from gesetze-im-internet.de into `data/raw/` |
 | `make convert`  | Convert fetched law XML into Markdown under `data/corpus/` |
+| `make chunk`    | Chunk the Markdown corpus into JSONL under `data/chunks/` |
 | `make check`    | Lint + types + tests (run before claiming work done) |
 | `make lint`     | ruff check + format check                      |
 | `make typecheck`| ty static type checking                        |
