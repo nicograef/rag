@@ -65,9 +65,9 @@ have to guess is declared outright:
   anchor, handed over verbatim.
 
 So convert parses the XML directly and maps declared structure deterministically to
-Markdown. The transform is **lossless** (nothing inferred, nothing guessed away) and
-**deterministic** (same input files → byte-identical output, asserted by golden-file tests
-per the [convert contract](../stages/convert.md)). This is also why Phase 1 uses no
+Markdown. The transform is **lossless** and **deterministic** (same input files →
+byte-identical output, asserted by golden-file tests per the
+[convert contract](../stages/convert.md)). This is also why Phase 1 uses no
 document-parsing library: reaching for one here would add the very approximation the XML
 lets us avoid — and writing the parser by hand *is* the document-parsing lesson, taken in
 the one case where it can be done exactly.
@@ -79,8 +79,7 @@ inline `<FnR>` markers) and editorial apparatus (`<standangabe>` status notes, `
 Fundstelle references) are the Dokumentationsstelle's editorial additions, not normative
 text, so convert excludes them — a licensing act and a quality act at once, since they are
 exactly the noise that would otherwise be embedded and retrieved as if it were law. The
-only whole norm type skipped is `Inhaltsübersicht`, the XML's own table of contents — a
-documented decision, not an accident.
+only whole norm type skipped is `Inhaltsübersicht`, the XML's own table of contents.
 
 ## No silent content loss: fail loud
 

@@ -16,6 +16,7 @@ Theory: docs/theory/corpus-and-parsing.md
 import argparse
 import json
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -207,26 +208,26 @@ def _render_section(norm: etree._Element) -> list[str]:
     return [f"{'#' * _section_depth(norm)} {heading}"]
 
 
-def _render_content(content: etree._Element, enbez: str) -> list[str]:
+def _render_content(content: etree._Element, context: str) -> list[str]:
     """A norm's ``<Content>``: paragraphs, template sub-headings, and block separators."""
     if _normalize(content.text or ""):
-        raise ConversionError(f"stray text in <Content> of {enbez!r}")
+        raise ConversionError(f"stray text in <Content> of {context!r}")
     blocks: list[str] = []
     for child in content:
         if child.tag == "P":
-            blocks.extend(_render_paragraph(child, enbez))
+            blocks.extend(_render_paragraph(child, context))
         elif child.tag == "Title":
             blocks.append(f"**{_inline_text(child)}**")
         elif child.tag == "BR":
             pass
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in {enbez!r}")
+            raise ConversionError(f"unsupported element <{child.tag}> in {context!r}")
         if _normalize(child.tail or ""):
-            raise ConversionError(f"stray text after <{child.tag}> in {enbez!r}")
+            raise ConversionError(f"stray text after <{child.tag}> in {context!r}")
     return blocks
 
 
-def _render_paragraph(paragraph: etree._Element, enbez: str) -> list[str]:
+def _render_paragraph(paragraph: etree._Element, context: str) -> list[str]:
     """One ``<P>`` → inline text blocks interleaved with list and table blocks.
 
     Inline children fold into a running buffer; block children (``DL``, ``table``,
@@ -244,13 +245,13 @@ def _render_paragraph(paragraph: etree._Element, enbez: str) -> list[str]:
     for child in paragraph:
         if child.tag == "DL":
             flush()
-            blocks.append("\n".join(_render_list(child, enbez)))
+            blocks.append("\n".join(_render_list(child, context)))
         elif child.tag == "table":
             flush()
-            blocks.append(_render_table(child, enbez))
+            blocks.append(_render_table(child, context))
         elif child.tag == "noindex":
             flush()
-            blocks.extend(_render_noindex(child, enbez))
+            blocks.extend(_render_noindex(child, context))
         elif child.tag == "BR":
             flush()
         elif child.tag in INLINE_IGNORED:
@@ -260,56 +261,64 @@ def _render_paragraph(paragraph: etree._Element, enbez: str) -> list[str]:
         elif child.tag == "B":
             buffer += f"**{_inline_text(child)}**"
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a paragraph of {enbez!r}")
+            raise ConversionError(
+                f"unsupported element <{child.tag}> in a paragraph of {context!r}"
+            )
         buffer += child.tail or ""
     flush()
     return blocks
 
 
-def _render_noindex(noindex: etree._Element, enbez: str) -> list[str]:
+def _render_noindex(noindex: etree._Element, context: str) -> list[str]:
     """A ``<noindex>`` wrapper: render its ``<P>`` children; drop ``<kommentar>``."""
     if _normalize(noindex.text or ""):
-        raise ConversionError(f"stray text in <noindex> of {enbez!r}")
+        raise ConversionError(f"stray text in <noindex> of {context!r}")
     blocks: list[str] = []
     for child in noindex:
         if child.tag == "P":
-            blocks.extend(_render_paragraph(child, enbez))
+            blocks.extend(_render_paragraph(child, context))
         elif child.tag == "kommentar":
             pass
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in <noindex> of {enbez!r}")
+            raise ConversionError(f"unsupported element <{child.tag}> in <noindex> of {context!r}")
         if _normalize(child.tail or ""):
-            raise ConversionError(f"stray text after <{child.tag}> in <noindex> of {enbez!r}")
+            raise ConversionError(f"stray text after <{child.tag}> in <noindex> of {context!r}")
     return blocks
 
 
-def _render_list(dl: etree._Element, enbez: str) -> list[str]:
-    """A ``<DL>`` enumeration → plain-text lines, nested lists indented 4 spaces."""
-    lines: list[str] = []
+def _list_items(dl: etree._Element, context: str) -> Iterator[tuple[str, etree._Element]]:
+    """Pair each ``<DT>`` marker with its ``<DD>`` item — the one place the DL grammar lives."""
     marker: str | None = None
     for child in dl:
         if child.tag == "DT":
-            marker = _list_marker(child, enbez)
+            marker = _list_marker(child, context)
         elif child.tag == "DD":
             if marker is None:
-                raise ConversionError(f"<DD> without a preceding <DT> in {enbez!r}")
-            lines.extend(_render_item(child, marker, enbez))
+                raise ConversionError(f"<DD> without a preceding <DT> in {context!r}")
+            yield marker, child
             marker = None
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a list of {enbez!r}")
+            raise ConversionError(f"unsupported element <{child.tag}> in a list of {context!r}")
+
+
+def _render_list(dl: etree._Element, context: str) -> list[str]:
+    """A ``<DL>`` enumeration → plain-text lines, nested lists indented 4 spaces."""
+    lines: list[str] = []
+    for marker, dd in _list_items(dl, context):
+        lines.extend(_render_item(dd, marker, context))
     return lines
 
 
-def _list_marker(dt: etree._Element, enbez: str) -> str:
+def _list_marker(dt: etree._Element, context: str) -> str:
     """A ``<DT>`` marker: its inline text, verbatim (markers are free-form source)."""
     if len(dt) and any(child.tag not in INLINE_IGNORED for child in dt):
-        raise ConversionError(f"unsupported child in <DT> of {enbez!r}")
+        raise ConversionError(f"unsupported child in <DT> of {context!r}")
     return _inline_text(dt)
 
 
-def _render_item(dd: etree._Element, marker: str, enbez: str) -> list[str]:
+def _render_item(dd: etree._Element, marker: str, context: str) -> list[str]:
     """A ``<DD>`` item → its lines: marker on the first, the rest indented 4 spaces."""
-    content_lines = _item_content_lines(dd, enbez)
+    content_lines = _item_content_lines(dd, context)
     if not marker:
         return content_lines
 
@@ -319,23 +328,23 @@ def _render_item(dd: etree._Element, marker: str, enbez: str) -> list[str]:
     return lines
 
 
-def _item_content_lines(dd: etree._Element, enbez: str) -> list[str]:
+def _item_content_lines(dd: etree._Element, context: str) -> list[str]:
     """A ``<DD>``'s ``<LA>`` runs → content lines (a leading empty line = starts with a list)."""
     if _normalize(dd.text or ""):
-        raise ConversionError(f"stray text in <DD> of {enbez!r}")
+        raise ConversionError(f"stray text in <DD> of {context!r}")
     lines: list[str] = []
     first = True
     for child in dd:
         if child.tag != "LA":
-            raise ConversionError(f"unsupported element <{child.tag}> in a <DD> of {enbez!r}")
-        lines.extend(_la_lines(child, enbez, first))
+            raise ConversionError(f"unsupported element <{child.tag}> in a <DD> of {context!r}")
+        lines.extend(_la_lines(child, context, first))
         first = False
         if _normalize(child.tail or ""):
-            raise ConversionError(f"stray text after <LA> in {enbez!r}")
+            raise ConversionError(f"stray text after <LA> in {context!r}")
     return lines or [""]
 
 
-def _la_lines(la: etree._Element, enbez: str, first: bool) -> list[str]:
+def _la_lines(la: etree._Element, context: str, first: bool) -> list[str]:
     """One ``<LA>`` → its text and nested-list lines; the first line may be empty."""
     lines: list[str] = []
     buffer = la.text or ""
@@ -349,11 +358,11 @@ def _la_lines(la: etree._Element, enbez: str, first: bool) -> list[str]:
     for child in la:
         if child.tag == "DL":
             flush()
-            lines.extend("    " + line for line in _render_list(child, enbez))
+            lines.extend("    " + line for line in _render_list(child, context))
         elif child.tag in INLINE_IGNORED:
             pass
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a <LA> of {enbez!r}")
+            raise ConversionError(f"unsupported element <{child.tag}> in a <LA> of {context!r}")
         buffer += child.tail or ""
     flush()
     if first and lines and not _normalize(la.text or ""):
@@ -361,31 +370,31 @@ def _la_lines(la: etree._Element, enbez: str, first: bool) -> list[str]:
     return lines or [""]
 
 
-def _render_table(table: etree._Element, enbez: str) -> str:
+def _render_table(table: etree._Element, context: str) -> str:
     """A CALS ``<table>`` → a Markdown pipe table, or a fenced block when irregular."""
     groups = table.findall("tgroup")
     if len(groups) != 1:
-        raise ConversionError(f"expected exactly one <tgroup> in a table of {enbez!r}")
+        raise ConversionError(f"expected exactly one <tgroup> in a table of {context!r}")
     tgroup = groups[0]
     cols_attr = tgroup.get("cols")
     if cols_attr is None or not cols_attr.isdigit():
-        raise ConversionError(f"table without a valid cols count in {enbez!r}")
+        raise ConversionError(f"table without a valid cols count in {context!r}")
     cols = int(cols_attr)
 
     theads = tgroup.findall("thead")
     if len(theads) > 1:
-        raise ConversionError(f"more than one <thead> in a table of {enbez!r}")
+        raise ConversionError(f"more than one <thead> in a table of {context!r}")
     head_rows = theads[0].findall("row") if theads else []
     if len(head_rows) > 1:
-        raise ConversionError(f"<thead> with more than one row in a table of {enbez!r}")
+        raise ConversionError(f"<thead> with more than one row in a table of {context!r}")
     bodies = tgroup.findall("tbody")
     if len(bodies) != 1:
-        raise ConversionError(f"expected exactly one <tbody> in a table of {enbez!r}")
+        raise ConversionError(f"expected exactly one <tbody> in a table of {context!r}")
     body_rows = bodies[0].findall("row")
 
     if _is_regular(head_rows + body_rows, cols):
-        return _render_regular_table(head_rows, body_rows, cols, enbez)
-    return _render_fenced_table(head_rows + body_rows, enbez)
+        return _render_regular_table(head_rows, body_rows, cols, context)
+    return _render_fenced_table(head_rows + body_rows, context)
 
 
 def _is_regular(rows: list[etree._Element], cols: int) -> bool:
@@ -400,12 +409,12 @@ def _is_regular(rows: list[etree._Element], cols: int) -> bool:
 
 
 def _render_regular_table(
-    head_rows: list[etree._Element], body_rows: list[etree._Element], cols: int, enbez: str
+    head_rows: list[etree._Element], body_rows: list[etree._Element], cols: int, context: str
 ) -> str:
     """A regular CALS table → a Markdown pipe table (empty header when no ``<thead>``)."""
-    header = _flatten_row(head_rows[0], enbez) if head_rows else [""] * cols
+    header = _flatten_row(head_rows[0], context) if head_rows else [""] * cols
     lines = [_pipe_row(header), _pipe_row(["---"] * cols)]
-    lines.extend(_pipe_row(_flatten_row(row, enbez)) for row in body_rows)
+    lines.extend(_pipe_row(_flatten_row(row, context)) for row in body_rows)
     return "\n".join(lines)
 
 
@@ -414,20 +423,20 @@ def _pipe_row(cells: list[str]) -> str:
     return "| " + " | ".join(cell.replace("|", "\\|") for cell in cells) + " |"
 
 
-def _render_fenced_table(rows: list[etree._Element], enbez: str) -> str:
+def _render_fenced_table(rows: list[etree._Element], context: str) -> str:
     """An irregular CALS table → a fenced ``table`` block preserving the source layout."""
     lines = ["```table"]
-    lines.extend(" | ".join(_flatten_row(row, enbez)) for row in rows)
+    lines.extend(" | ".join(_flatten_row(row, context)) for row in rows)
     lines.append("```")
     return "\n".join(lines)
 
 
-def _flatten_row(row: etree._Element, enbez: str) -> list[str]:
+def _flatten_row(row: etree._Element, context: str) -> list[str]:
     """A ``<row>`` → one flattened line per ``<entry>``."""
-    return [_flatten_cell(entry, enbez) for entry in row.findall("entry")]
+    return [_flatten_cell(entry, context) for entry in row.findall("entry")]
 
 
-def _flatten_cell(entry: etree._Element, enbez: str) -> str:
+def _flatten_cell(entry: etree._Element, context: str) -> str:
     """A table ``<entry>`` → one whitespace-normalized line."""
     parts = [entry.text or ""]
     for child in entry:
@@ -438,52 +447,45 @@ def _flatten_cell(entry: etree._Element, enbez: str) -> str:
         elif child.tag == "NB":
             parts.append(_inline_text(child))
         elif child.tag == "DL":
-            parts.append(" " + " ".join(_flatten_list(child, enbez)) + " ")
+            parts.append(" " + " ".join(_flatten_list(child, context)) + " ")
         elif child.tag in INLINE_IGNORED:
             pass
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a table cell of {enbez!r}")
+            raise ConversionError(
+                f"unsupported element <{child.tag}> in a table cell of {context!r}"
+            )
         parts.append(child.tail or "")
     return _normalize("".join(parts))
 
 
-def _flatten_list(dl: etree._Element, enbez: str) -> list[str]:
+def _flatten_list(dl: etree._Element, context: str) -> list[str]:
     """A ``<DL>`` inside a cell → ``marker text`` fragments (recursing into nested lists)."""
     fragments: list[str] = []
-    marker: str | None = None
-    for child in dl:
-        if child.tag == "DT":
-            marker = _list_marker(child, enbez)
-        elif child.tag == "DD":
-            if marker is None:
-                raise ConversionError(f"<DD> without a preceding <DT> in {enbez!r}")
-            fragments.append(_normalize(f"{marker} {_flatten_dd(child, enbez)}"))
-            marker = None
-        else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a list of {enbez!r}")
+    for marker, dd in _list_items(dl, context):
+        fragments.append(_normalize(f"{marker} {_flatten_dd(dd, context)}"))
     return fragments
 
 
-def _flatten_dd(dd: etree._Element, enbez: str) -> str:
+def _flatten_dd(dd: etree._Element, context: str) -> str:
     """A ``<DD>`` inside a cell → its ``<LA>`` runs and nested lists as one line."""
     parts: list[str] = []
     for child in dd:
         if child.tag != "LA":
-            raise ConversionError(f"unsupported element <{child.tag}> in a <DD> of {enbez!r}")
-        parts.append(_flatten_la(child, enbez))
+            raise ConversionError(f"unsupported element <{child.tag}> in a <DD> of {context!r}")
+        parts.append(_flatten_la(child, context))
     return " ".join(part for part in parts if part)
 
 
-def _flatten_la(la: etree._Element, enbez: str) -> str:
+def _flatten_la(la: etree._Element, context: str) -> str:
     """A ``<LA>`` inside a cell → its text and nested-list fragments as one line."""
     parts = [la.text or ""]
     for child in la:
         if child.tag == "DL":
-            parts.append(" " + " ".join(_flatten_list(child, enbez)) + " ")
+            parts.append(" " + " ".join(_flatten_list(child, context)) + " ")
         elif child.tag in INLINE_IGNORED:
             pass
         else:
-            raise ConversionError(f"unsupported element <{child.tag}> in a <LA> of {enbez!r}")
+            raise ConversionError(f"unsupported element <{child.tag}> in a <LA> of {context!r}")
         parts.append(child.tail or "")
     return _normalize("".join(parts))
 
