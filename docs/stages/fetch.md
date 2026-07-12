@@ -62,6 +62,5 @@ laws are still fetched. The exit code is non-zero if any law failed.
 
 ## Downstream consumers
 
-**convert** reads the extracted XML file(s) and takes `source_url` and `fetched_at`
-from `fetch.json` for the corpus front matter (its contract, `docs/stages/convert.md`,
-lands in the next slice).
+**convert** ([contract](convert.md)) reads the extracted XML file(s) and takes
+`source_url` and `fetched_at` from `fetch.json` for the corpus front matter.

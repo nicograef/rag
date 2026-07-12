@@ -214,15 +214,15 @@ rely on), and the normative-text-only rule from the licensing decision.
 
 ### Acceptance criteria
 
-- [ ] `make convert` turns `data/raw/kassensichv/` into `data/corpus/kassensichv.md` with
+- [x] `make convert` turns `data/raw/kassensichv/` into `data/corpus/kassensichv.md` with
       correct front matter and one section per norm unit (11 §§ plus `Eingangsformel` and
       `Schlussformel`).
-- [ ] Golden-file test: fixture XML → pinned Markdown, compared byte-exactly; running
+- [x] Golden-file test: fixture XML → pinned Markdown, compared byte-exactly; running
       convert twice on the same input is asserted byte-identical.
-- [ ] Convert reads only `data/raw/` and never performs network I/O.
-- [ ] `docs/stages/convert.md` documents the contract including every front-matter field
+- [x] Convert reads only `data/raw/` and never performs network I/O.
+- [x] `docs/stages/convert.md` documents the contract including every front-matter field
       and the normative-text-only rule.
-- [ ] `lxml` is declared in `pyproject.toml` with the lockfile updated; `make check` is
+- [x] `lxml` is declared in `pyproject.toml` with the lockfile updated; `make check` is
       green.
 
 ---

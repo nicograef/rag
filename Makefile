@@ -13,10 +13,13 @@ setup:         ## Install dependencies into .venv (uv sync)
 
 # ── Pipeline (offline ingestion) ──
 
-.PHONY: fetch
+.PHONY: fetch convert
 
 fetch:         ## Download law XML from gesetze-im-internet.de into data/raw/
 	uv run python -m rag.fetch
+
+convert:       ## Convert fetched law XML into Markdown under data/corpus/
+	uv run python -m rag.convert
 
 # ── Code Quality ──
 
