@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE dokumente SYSTEM "http://www.gesetze-im-internet.de/dtd/1.01/gii-norm.dtd">
+<dokumente builddate="20260202000000" doknr="BJNRARTIKELG"><norm builddate="20260202000000" doknr="BJNRARTIKELG"><metadaten><jurabk>ArtG</jurabk><langue>Artikelgesetz für Verfassungsstrukturen (Testfixture)</langue></metadaten></norm>
+
+<norm doknr="BJNRARTIKELG001"><metadaten><jurabk>ArtG</jurabk><enbez>Eingangsformel</enbez></metadaten><textdaten><text format="XML"><Content><P>Der Rat hat das <SP>Artikelgesetz für Verfassungsstrukturen</SP> beschlossen und verkündet.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG002"><metadaten><jurabk>ArtG</jurabk><enbez>Präambel</enbez></metadaten><textdaten><text format="XML"><Content><P><SP>Im Bewußtsein seiner Verantwortung,</SP><BR/><SP>hat sich das Volk dieses Gesetz gegeben.</SP></P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG003"><metadaten><jurabk>ArtG</jurabk><gliederungseinheit><gliederungskennzahl>010</gliederungskennzahl><gliederungsbez>I.</gliederungsbez><gliederungstitel>Die Grundrechte</gliederungstitel></gliederungseinheit></metadaten><textdaten><text format="XML"><Content><P/></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG004"><metadaten><jurabk>ArtG</jurabk><enbez>Art 1</enbez><titel format="XML">Menschenwürde</titel></metadaten><textdaten><text format="XML"><Content><P>(1) Die Würde des Menschen ist unantastbar.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG005"><metadaten><jurabk>ArtG</jurabk><enbez>Art 2</enbez><titel format="XML">(weggefallen)</titel></metadaten><textdaten><text format="XML"><Content/></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG006"><metadaten><jurabk>ArtG</jurabk><enbez>Art 3</enbez><titel format="XML">Eid</titel></metadaten><textdaten><text format="XML"><Content><P>Der Amtsträger leistet folgenden Eid: <DL Font="normal" Type="arabic"><DT/><DD Font="normal"><LA Size="normal">"Ich schwöre, meine Pflichten zu erfüllen."</LA></DD></DL>Der Eid kann ohne religiöse Beteuerung geleistet werden.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG007"><metadaten><jurabk>ArtG</jurabk><enbez>Art 4</enbez><titel format="XML">Empfehlungen</titel></metadaten><textdaten><text format="XML"><Content><P>Die Regierungen empfehlen, <DL Font="normal" Type="arabic"><DT>-</DT><DD Font="normal"><LA Size="normal">das Verhältnis zwischen Bund und Ländern zu prüfen,</LA></DD><DT>-</DT><DD Font="normal"><LA Size="normal">die Neugliederung zu erwägen.</LA></DD></DL></P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRARTIKELG008"><metadaten><jurabk>ArtG</jurabk><enbez>Anhang EV</enbez></metadaten><textdaten><text format="XML"><Content><P><noindex><P>- EinigVtr v. 31.8.1990 - <BR/>sieht folgende Maßgaben vor:</P><P>(1) Der Anteil beträgt <table frame="none"><tgroup align="left" cols="2" colsep="0" rowsep="0"><colspec colname="col1" colwidth="10*"/><colspec colname="col2" colwidth="25*"/><tbody valign="top"><row><entry valign="top">1991</entry><entry align="right" valign="top">55 vom Hundert</entry></row><row><entry valign="top">1992</entry><entry align="right" valign="top">60 vom Hundert</entry></row></tbody></tgroup></table><BR/>des durchschnittlichen Anteils.</P></noindex></P></Content></text></textdaten></norm>
+</dokumente>

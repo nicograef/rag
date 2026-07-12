@@ -259,15 +259,15 @@ sample, one `Art`-based sample, one `Anlage` table sample.
 
 ### Acceptance criteria
 
-- [ ] All four MVP laws convert without errors or silent content loss; a documented
+- [x] All four MVP laws convert without errors or silent content loss; a documented
       spot-check (§ 3 AO full text, Art 1 GG, one UStG `Anlage` table) matches the
       official text.
-- [ ] Heading nesting in the Markdown mirrors the `gliederungskennzahl` structure; GG
+- [x] Heading nesting in the Markdown mirrors the `gliederungskennzahl` structure; GG
       renders `Präambel`, `Art` units, and `Anhang EV`; UStG's `Anlage` tables are
       present; footnotes and editorial apparatus are absent.
-- [ ] Tables render as pinned in the golden-table fixture (Markdown table for the regular
+- [x] Tables render as pinned in the golden-table fixture (Markdown table for the regular
       case, fenced block for the irregular case).
-- [ ] Golden-file tests cover hierarchy, `Art` units, and an `Anlage` table via small
+- [x] Golden-file tests cover hierarchy, `Art` units, and an `Anlage` table via small
       fixtures; `make check` is green.
 
 ---

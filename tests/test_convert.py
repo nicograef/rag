@@ -11,17 +11,22 @@ FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_LAW = FIXTURES / "raw" / "kassensichv"
 GOLDEN = FIXTURES / "corpus" / "kassensichv.md"
 
-
-def test_convert_law_matches_golden_file(tmp_path: Path) -> None:
-    output = convert_law(FIXTURE_LAW, tmp_path)
-
-    assert output == tmp_path / "kassensichv.md"
-    assert output.read_bytes() == GOLDEN.read_bytes()
+LAWS = ["kassensichv", "strukturg", "artg", "tabelleng"]
 
 
-def test_convert_is_deterministic(tmp_path: Path) -> None:
-    first = convert_law(FIXTURE_LAW, tmp_path / "one").read_bytes()
-    second = convert_law(FIXTURE_LAW, tmp_path / "two").read_bytes()
+@pytest.mark.parametrize("slug", LAWS)
+def test_convert_law_matches_golden_file(slug: str, tmp_path: Path) -> None:
+    output = convert_law(FIXTURES / "raw" / slug, tmp_path)
+
+    assert output == tmp_path / f"{slug}.md"
+    assert output.read_bytes() == (FIXTURES / "corpus" / f"{slug}.md").read_bytes()
+
+
+@pytest.mark.parametrize("slug", LAWS)
+def test_convert_is_deterministic(slug: str, tmp_path: Path) -> None:
+    law_dir = FIXTURES / "raw" / slug
+    first = convert_law(law_dir, tmp_path / "one").read_bytes()
+    second = convert_law(law_dir, tmp_path / "two").read_bytes()
 
     assert first == second
 
@@ -47,12 +52,33 @@ HEADER_NORM = (
 @pytest.mark.parametrize(
     "norm",
     [
-        # CALS-style table in a norm body — deferred to the next slice, must not pass silently.
-        "<norm><metadaten><enbez>Anlage 1</enbez></metadaten><textdaten><text>"
-        "<Content><table/></Content></text></textdaten></norm>",
-        # Section hierarchy — likewise deferred.
+        # Unknown inline element in a paragraph — must not be silently dropped.
+        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text>"
+        "<Content><P>Bild <IMG SRC='x.png'/> hier.</P></Content></text></textdaten></norm>",
+        # A block-level element in a table cell is beyond the cell-flattening model.
+        "<norm><metadaten><enbez>Anlage 1</enbez></metadaten><textdaten><text><Content><P>"
+        "<table><tgroup cols='1'><tbody><row><entry><P>Absatz</P></entry></row>"
+        "</tbody></tgroup></table></P></Content></text></textdaten></norm>",
+        # A gliederungskennzahl of length 18 would push its units past H6.
+        "<norm><metadaten><gliederungseinheit>"
+        "<gliederungskennzahl>010010010010010010</gliederungskennzahl>"
+        "<gliederungsbez>Tief</gliederungsbez></gliederungseinheit></metadaten></norm>",
+        # A section norm must render to an empty body; stray text is content loss.
         "<norm><metadaten><gliederungseinheit><gliederungskennzahl>010</gliederungskennzahl>"
-        "</gliederungseinheit><enbez>§ 1</enbez></metadaten></norm>",
+        "<gliederungsbez>Teil</gliederungsbez></gliederungseinheit></metadaten><textdaten><text>"
+        "<Content><P>Text im Abschnitt</P></Content></text></textdaten></norm>",
+        # A thead with two rows is outside the single-header-row table model.
+        "<norm><metadaten><enbez>Anlage 1</enbez></metadaten><textdaten><text><Content><P>"
+        "<table><tgroup cols='1'><thead><row><entry>A</entry></row>"
+        "<row><entry>B</entry></row></thead><tbody><row><entry>C</entry></row></tbody>"
+        "</tgroup></table></P></Content></text></textdaten></norm>",
+        # A DD holding something other than <LA> — the item shape is unsupported.
+        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content><P>"
+        "Liste: <DL><DT>1.</DT><DD><P>Absatz statt LA</P></DD></DL></P></Content>"
+        "</text></textdaten></norm>",
+        # A gliederungskennzahl whose length is not a multiple of three is malformed.
+        "<norm><metadaten><gliederungseinheit><gliederungskennzahl>0100</gliederungskennzahl>"
+        "<gliederungsbez>Teil</gliederungsbez></gliederungseinheit></metadaten></norm>",
     ],
 )
 def test_unsupported_structure_fails_loudly_instead_of_losing_content(

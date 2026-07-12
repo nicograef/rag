@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE dokumente SYSTEM "http://www.gesetze-im-internet.de/dtd/1.01/gii-norm.dtd">
+<dokumente builddate="20260101000000" doknr="BJNRSTRUKTUR"><norm builddate="20260101000000" doknr="BJNRSTRUKTUR"><metadaten><jurabk>StrukturG</jurabk><langue>Gesetz über die Gliederungsstruktur (Testfixture)</langue></metadaten></norm>
+
+<norm doknr="BJNRSTRUKTUR001"><metadaten><jurabk>StrukturG</jurabk><gliederungseinheit><gliederungskennzahl>010</gliederungskennzahl><gliederungsbez>Erster Teil</gliederungsbez><gliederungstitel>Einleitende Vorschriften</gliederungstitel></gliederungseinheit></metadaten><textdaten><text format="XML"><Content><P/></Content></text><fussnoten/></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR002"><metadaten><jurabk>StrukturG</jurabk><gliederungseinheit><gliederungskennzahl>010010</gliederungskennzahl><gliederungsbez>Erster Abschnitt</gliederungsbez><gliederungstitel>Anwendungsbereich</gliederungstitel></gliederungseinheit></metadaten><textdaten><text format="XML"><Content><P/></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR003"><metadaten><jurabk>StrukturG</jurabk><enbez>§ 1</enbez><titel format="XML">Anwendungsbereich</titel></metadaten><textdaten><text format="XML"><Content><P>(1) Dieses Gesetz gilt für Testzwecke.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR004"><metadaten><jurabk>StrukturG</jurabk><enbez>§ 2</enbez></metadaten><textdaten><text format="XML"><Content><P>Diese Vorschrift hat keinen Titel.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR005"><metadaten><jurabk>StrukturG</jurabk><gliederungseinheit><gliederungskennzahl>010010010</gliederungskennzahl><gliederungsbez>Erster Unterabschnitt</gliederungsbez></gliederungseinheit></metadaten><textdaten><text format="XML"><Content><P/></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR006"><metadaten><jurabk>StrukturG</jurabk><enbez>§ 3</enbez><titel format="XML">(weggefallen)</titel></metadaten><textdaten><text format="XML"><Content><P/></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR007"><metadaten><jurabk>StrukturG</jurabk><enbez>(XXXX) §§ 4 bis 6</enbez><titel format="XML">(weggefallen)</titel></metadaten><textdaten><text format="XML"><Content><P/></Content></text><fussnoten><Content><P>(+++ §§ 4 bis 6: Zur Anwendung vgl. Art. 1 +++)</P></Content></fussnoten></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR008"><metadaten><jurabk>StrukturG</jurabk><enbez>§ 7</enbez><titel format="XML">Vermögensbindung</titel></metadaten><textdaten><text format="XML"><Content><P>(1) Das Vermögen fällt <DL Font="normal" Type="arabic"><DT>1.</DT><DD Font="normal"><LA Size="normal">an eine Körperschaft, und zwar <DL Font="normal" Type="alpha"><DT>a)</DT><DD Font="normal"><LA Size="normal">für gemeinnützige Zwecke oder</LA></DD><DT>b)</DT><DD Font="normal"><LA Size="normal">für mildtätige Zwecke,</LA></DD></DL>soweit dies zulässig ist.</LA><LA Size="normal">oder</LA></DD><DT>2.</DT><DD Font="normal"><LA Size="normal">an eine öffentlich-rechtliche Person.</LA></DD><DT>"3.</DT><DD Font="normal"><LA Size="normal"><DL Font="normal" Type="alpha"><DT>a)</DT><DD Font="normal"><LA Size="normal">nur mit Zustimmung."</LA></DD></DL></LA></DD></DL>Satz 1 gilt entsprechend.</P></Content></text></textdaten></norm>
+
+<norm doknr="BJNRSTRUKTUR009"><metadaten><jurabk>StrukturG</jurabk><enbez>Anlage 1</enbez><titel format="XML">(zu § 7)<BR/>Mustersatzung für Testkörperschaften</titel></metadaten><textdaten><text format="XML"><Content><Title Align="auto">§ 1</Title><P>Die Körperschaft verfolgt ausschließlich gemeinnützige Zwecke.</P><BR/><BR/><Title Align="auto">§ 2</Title><P>Die Körperschaft ist <B>selbstlos</B> tätig.</P></Content></text></textdaten></norm>
+</dokumente>
