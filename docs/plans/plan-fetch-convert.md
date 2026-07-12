@@ -303,14 +303,14 @@ the two new targets. Roadmap Phase 1 flips to ✅.
 
 ### Acceptance criteria
 
-- [ ] `docs/theory/corpus-and-parsing.md` exists, is concise, and is cross-linked both
+- [x] `docs/theory/corpus-and-parsing.md` exists, is concise, and is cross-linked both
       ways (docstrings → chapter, chapter → code and contracts, README overview →
       chapter); the concept appears nowhere else in the repo except as links.
-- [ ] README: Phase 1 row ✅, quick start includes fetch/convert with measured first-run
+- [x] README: Phase 1 row ✅, quick start includes fetch/convert with measured first-run
       cost and a fresh clean-checkout verification date; structure table lists
       `docs/stages/`, `docs/theory/`, `laws.toml`; every relative link resolves.
-- [ ] AGENTS.md Commands table lists `make fetch` and `make convert`.
-- [ ] Roadmap Phase 1 marked ✅; `make check` green; full pipeline re-run from a clean
+- [x] AGENTS.md Commands table lists `make fetch` and `make convert`.
+- [x] Roadmap Phase 1 marked ✅; `make check` green; full pipeline re-run from a clean
       checkout (`make fetch && make convert`) succeeds and is dated in the README.
-- [ ] Definition-of-done audit against AGENTS.md rule 5 passes: code + tests + theory
+- [x] Definition-of-done audit against AGENTS.md rule 5 passes: code + tests + theory
       chapter + two stage contracts + README status with date — all present.

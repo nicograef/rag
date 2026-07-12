@@ -10,6 +10,7 @@ byte-identical output. Anything the converter cannot render faithfully raises
 ``ConversionError`` instead of silently dropping content.
 
 Stage contract: docs/stages/convert.md
+Theory: docs/theory/corpus-and-parsing.md
 """
 
 import argparse

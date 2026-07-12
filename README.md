@@ -28,32 +28,36 @@ in the [roadmap](docs/roadmap.md).
 | Phase                                | Stages                                  | Status |
 | ------------------------------------ | --------------------------------------- | ------ |
 | 0 — Scaffold                         | — (repo, tooling, database)             | ✅     |
-| 1 — Fetch & convert                  | fetch, convert                          | ⬜     |
+| 1 — Fetch & convert                  | fetch, convert                          | ✅     |
 | 2 — Structure-aware chunking         | chunk                                   | ⬜     |
 | 3 — Embed & load                     | embed, load                             | ⬜     |
 | 4 — Online PoC                       | retrieve, assemble, generate            | ⬜     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-Quick start last verified from a clean checkout: **2026-07-11** (all steps except the
-`make db` image download, which the verifying environment's network blocked).
+Quick start last verified from a clean checkout: **2026-07-12** (all steps, including the
+`make db` image download and a live `make fetch && make convert`).
 
 ## Quick start
 
-What runs today (Phase 0): the dev setup, the checks, and the database.
+What runs today (Phases 0–1): the dev setup, the checks, the database, and the first two
+pipeline stages.
 
 ```bash
 bash scripts/setup-dev-tools.sh   # install uv + sync Python dev dependencies (idempotent)
 cp .env.example .env              # then fill in POSTGRES_PASSWORD
 make db                           # start Postgres 17 + pgvector (Docker Compose)
 make check                        # lint + types + tests
+make fetch                        # download the law XML (~0.4 MB) into data/raw/
+make convert                      # convert it into Markdown under data/corpus/
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
 Compose plugin, and Python 3.12 (uv installs one if missing).
 
-**First-run costs** (measured 2026-07-11): ~65 MB of Python dev dependencies (ruff, ty,
-pytest) plus uv's download cache, and a one-time ~160 MB (compressed) pull of the
-`pgvector/pgvector:pg17` image. **Future phases add multi-gigabyte downloads** — an
+**First-run costs** (measured 2026-07-11, corpus 2026-07-12): ~65 MB of Python dev
+dependencies (ruff, ty, pytest) plus uv's download cache, a one-time ~160 MB (compressed)
+pull of the `pgvector/pgvector:pg17` image, and ~0.4 MB zipped (~1.8 MB extracted) of law
+XML for the four-law MVP corpus. **Future phases add multi-gigabyte downloads** — an
 embedding model (Phase 3) and open-weight LLM weights via Ollama (Phase 4). Those costs are
 documented here when their phases land; until the status table above marks a phase ✅, its
 downloads and commands don't exist yet.
@@ -66,8 +70,8 @@ on disk or database state:
 
 | Stage       | Responsibility                  | Input → output artifact                          |
 | ----------- | ------------------------------- | ------------------------------------------------ |
-| **fetch**   | acquire the source              | source → raw files (official law XML)            |
-| **convert** | make the source workable        | raw files → clean Markdown corpus                |
+| **[fetch](docs/stages/fetch.md)**     | acquire the source      | source → raw files (official law XML) |
+| **[convert](docs/stages/convert.md)** | make the source workable | raw files → clean Markdown corpus    |
 | **chunk**   | slice into retrieval units      | corpus → chunk records with metadata             |
 | **embed**   | turn text into vectors          | chunk records → vectors                          |
 | **load**    | own the database (incl. schema and indexes) | chunk records + vectors → database   |
@@ -85,8 +89,12 @@ assembled prompt, answer):
 **evaluate** is a cross-cutting harness, not a pipeline stage: a checked-in gold-question
 set plus a pinned configuration in, a dated metrics report out.
 
-Each stage's precise contract and its theory chapter (`docs/theory/<building-block>.md`)
-land with the phase that implements it — see the status table above for what exists today.
+Each stage's precise contract (`docs/stages/<stage>.md`) and its theory chapter
+(`docs/theory/<building-block>.md`) land with the phase that implements it — fetch and
+convert's contracts are linked above, and their chapter,
+[corpus & parsing](docs/theory/corpus-and-parsing.md), explains why corpus choice,
+licensing, and lossless parsing are RAG decisions. See the status table above for what
+exists today.
 The [concept map](docs/concepts.md) indexes every RAG concept the playbook tracks — a
 one-line definition each, plus where it lives: a phase, a backlog item, a theory chapter,
 or a recorded reason it is deliberately out of scope.
@@ -96,14 +104,17 @@ or a recorded reason it is deliberately out of scope.
 German federal law (XML from gesetze-im-internet.de) is a deliberate feature: real structure
 (law → Buch/Abschnitt → § → Absatz) makes structure-aware chunking and citations a genuine
 lesson instead of a toy exercise, and the norm texts are amtliche Werke (§ 5 UrhG) — public
-domain. The corpus is German-language; that limitation is acknowledged and offset by the
+domain. The full argument is the [corpus & parsing](docs/theory/corpus-and-parsing.md)
+chapter. The corpus is German-language; that limitation is acknowledged and offset by the
 swap path.
 
 **Swapping in your own corpus** — the honest blast radius: reimplement **fetch** and
 **convert** for your source, and adapt the chunker's structural logic and citation fields to
 your documents' structure. The chunk-record contract uses corpus-neutral field names, and
 each stage contract states exactly which fields downstream stages require — so the boundary
-is explicit, not discovered. Contracts land with their phases (status table above).
+is explicit, not discovered. The first two contracts ([fetch](docs/stages/fetch.md),
+[convert](docs/stages/convert.md)) are landed; the rest arrive with their phases (status
+table above).
 
 ## Project status & support
 
@@ -121,10 +132,13 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `tests/`             | pytest suites                                                    |
 | `docs/roadmap.md`    | Phased plan, dated decisions log, enhancement backlog            |
 | `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
+| `docs/stages/`       | Stage contracts: input/output artifacts, invocation, guarantees  |
+| `docs/theory/`       | Theory chapters: one building block each, landed with its phase  |
 | `docs/prds/`         | Product big picture (the playbook PRD)                           |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads, corpus, artifacts — gitignored, re-runnable       |
+| `laws.toml`          | Corpus config: one entry per law to fetch                        |
 | `docker-compose.yml` | Postgres 17 + pgvector dev stack                                 |
 | `Makefile`           | Dev interface (`make help`)                                      |
 | `AGENTS.md`          | Contributor/agent instructions (loaded by Claude via `CLAUDE.md`)|

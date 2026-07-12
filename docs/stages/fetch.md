@@ -21,7 +21,7 @@ uv run python -m rag.fetch      # options: --config laws.toml --raw-dir data/raw
   gesetze-im-internet.de **slug** to a human-readable label (log output only).
   Adding a law to the corpus means adding one entry.
 - Network: `https://www.gesetze-im-internet.de/<slug>/xml.zip` per law
-  (≈ 0.4 MB zipped / 1.9 MB extracted for the four MVP laws, measured 2026-07-12).
+  (≈ 0.4 MB zipped / 1.8 MB extracted for the four MVP laws, measured 2026-07-12).
 
 ## Output
 

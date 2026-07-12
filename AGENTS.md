@@ -38,6 +38,8 @@ All commands via Makefile in the project root (`make help` for the full list).
 | Command         | Description                                    |
 | --------------- | ---------------------------------------------- |
 | `make setup`    | Install dependencies (`uv sync`)               |
+| `make fetch`    | Download law XML from gesetze-im-internet.de into `data/raw/` |
+| `make convert`  | Convert fetched law XML into Markdown under `data/corpus/` |
 | `make check`    | Lint + types + tests (run before claiming work done) |
 | `make lint`     | ruff check + format check                      |
 | `make typecheck`| ty static type checking                        |

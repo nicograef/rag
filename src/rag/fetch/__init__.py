@@ -6,6 +6,7 @@ Re-running replaces each law's directory cleanly (idempotence); a failing law ne
 touches the artifacts of other laws or of its own previous run.
 
 Stage contract: docs/stages/fetch.md
+Theory: docs/theory/corpus-and-parsing.md
 """
 
 import argparse

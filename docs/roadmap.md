@@ -13,7 +13,7 @@ Status legend: ✅ done · 🔨 in progress · ⬜ open
 Repo skeleton: uv project, ruff + pytest, Makefile, Postgres 17 + pgvector Compose stack,
 devcontainer, CI, handbook conventions (AGENTS.md/CLAUDE.md, plugin adoption).
 
-## Phase 1 — Fetch & convert (corpus acquisition) ⬜
+## Phase 1 — Fetch & convert (corpus acquisition) ✅
 
 Stages: **fetch**, **convert**
 
