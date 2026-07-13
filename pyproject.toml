@@ -14,7 +14,7 @@ dev = [
   "lxml-stubs>=0.5.1",
   "pytest>=8",
   "ruff>=0.9",
-  "ty>=0.0.58",
+  "ty>=0.0.59",
 ]
 
 [build-system]
