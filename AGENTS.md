@@ -71,8 +71,8 @@ All commands via Makefile in the project root (`make help` for the full list).
 ## Code Style
 
 ```python
-def chunk_law(law: Law, max_chars: int = 2000) -> list[Chunk]:
-    """Split a law into structure-aware chunks, one § at a time."""
+def chunk_document(text: str, max_chars: int = 2000) -> list[Chunk]:
+    """Split a document into structure-aware chunks, one § at a time."""
     ...
 ```
 

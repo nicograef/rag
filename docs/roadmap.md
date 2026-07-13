@@ -213,7 +213,7 @@ reference implementation a learner can clone and run — in that order.
 **Concept coverage map** (decided 2026-07-11): the playbook tracks the RAG concept space
 explicitly instead of implicitly.
 
-- **Context:** a comprehensive external list of RAG concepts (ingestion → chunking →
+- **Context:** an external list of RAG concepts (ingestion → chunking →
   vectorization → retrieval → query transformation → generation → guardrails → evaluation →
   advanced architectures) was audited against the repo. Most core concepts already had a
   home, but several techniques (metadata filtering, advanced chunking, agentic/corrective

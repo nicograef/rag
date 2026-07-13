@@ -495,7 +495,7 @@ def chunk_corpus(
     max_chars: int = DEFAULT_MAX_CHARS,
     merge_floor: int = DEFAULT_MERGE_FLOOR,
 ) -> list[Chunk]:
-    """Parse one law's corpus Markdown into its chunk records (pure).
+    """Parse one law's corpus Markdown into its chunk records.
 
     Emits one chunk per non-empty norm unit that fits ``max_chars``; a unit whose ``text``
     exceeds it is split into ordered parts (Absatz groups with one-Absatz overlap, or the

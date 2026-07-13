@@ -3,7 +3,7 @@
 Every RAG concept, technique, and term the playbook tracks — one line of definition and the
 place where it lives, or the recorded reason it deliberately doesn't. This is the project's
 ubiquitous language: docs, code, and commits use exactly these names. Coverage audited
-2026-07-11 against a comprehensive external RAG concept list; phases and backlog items
+2026-07-11 against an external RAG concept list; phases and backlog items
 refer to the [roadmap](roadmap.md).
 
 How to read the **Place** column:
