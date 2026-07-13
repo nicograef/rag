@@ -137,7 +137,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
 | `docs/stages/`       | Stage contracts: input/output artifacts, invocation, guarantees  |
 | `docs/theory/`       | Theory chapters: one building block each, landed with its phase  |
-| `docs/prds/`         | Product big picture (the playbook PRD)                           |
+| `docs/prds/`         | PRDs: product big picture (playbook) and per-phase feature PRDs  |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`) — gitignored, re-runnable |
