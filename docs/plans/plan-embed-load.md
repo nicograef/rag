@@ -3,6 +3,16 @@
 > Source PRD: [../prds/prd-embed-load.md](../prds/prd-embed-load.md) ·
 > Roadmap phase: [../roadmap.md](../roadmap.md) "Phase 3 — Embed & load (vector store)"
 
+> **Implementation status (2026-07-14):** all five slices landed. The unchecked boxes
+> below share one cause: the implementing cloud session's egress policy blocked
+> huggingface.co (no model download) and gesetze-im-internet.de (no live corpus), so the
+> on-machine model measurements, the tokenizer check on real chunks, the real-model
+> reference-vector run (`tests/pin_reference_vectors.py`), the full-corpus run, and the
+> retrieval spot-check need one local session. Where each result belongs is written into
+> the artifacts: the roadmap decision entry, `docs/stages/load.md#verification`, and the
+> README verification line. DB behavior was fully verified against a local
+> Postgres 16 + pgvector (apt) because the Docker image CDN was also blocked.
+
 ## Goal
 
 Land the **embed** and **load** stages: turn every chunk record under `data/chunks/` into a
@@ -199,7 +209,7 @@ condition).
 - [ ] The Phase 2 chunk size is confirmed against the chosen model's tokenizer on real
       chunks (or the required `max_chars` adjustment is recorded in the entry and applied to
       the chunk stage with re-pinned golden files before Slice 2 starts).
-- [ ] `sentence-transformers` is added and `make check` is green — no stage code yet.
+- [x] `sentence-transformers` is added and `make check` is green — no stage code yet.
 
 ---
 
@@ -237,15 +247,15 @@ when the model cache is absent).
 
 ### Acceptance criteria
 
-- [ ] `make embed` turns every `data/chunks/<slug>.jsonl` into
+- [x] `make embed` turns every `data/chunks/<slug>.jsonl` into
       `data/embeddings/<slug>.jsonl`, one self-describing record per chunk, order preserved;
       missing/empty chunks dir exits non-zero with a "run `make chunk` first" hint.
 - [ ] Golden-file tests with the fake embedder pass byte-exactly and run without torch, a
       model download, or network; the real-model reference-vector test passes locally within
       tolerance and skips cleanly elsewhere.
-- [ ] `docs/stages/embed.md` documents invocation, input, artifact schema, guarantees,
+- [x] `docs/stages/embed.md` documents invocation, input, artifact schema, guarantees,
       failure behaviour, and downstream consumers.
-- [ ] `make check` is green.
+- [x] `make check` is green.
 
 ---
 
@@ -284,17 +294,17 @@ removed id disappears (stale-row pruning), and a wrong-dimension artifact is rej
 
 ### Acceptance criteria
 
-- [ ] `make load` (with `make db` up and artifacts present) creates the `chunks` table and
+- [x] `make load` (with `make db` up and artifacts present) creates the `chunks` table and
       HNSW index and fills one row per chunk, joined correctly by `id`; missing inputs exit
       non-zero with a "run `make embed` first" hint.
-- [ ] Re-running `make load` is idempotent; removing a chunk upstream and re-running prunes
+- [x] Re-running `make load` is idempotent; removing a chunk upstream and re-running prunes
       its row; per-law validation errors (missing vector, orphan vector, model/dim mismatch)
       fail that law without partial writes.
-- [ ] Default tests pass without a database; integration tests pass against the Compose
+- [x] Default tests pass without a database; integration tests pass against the Compose
       Postgres locally and skip cleanly elsewhere.
-- [ ] `docs/stages/load.md` documents invocation, inputs, the owned schema, replace
+- [x] `docs/stages/load.md` documents invocation, inputs, the owned schema, replace
       semantics, connection config, failure behaviour, and downstream consumers.
-- [ ] `make check` is green.
+- [x] `make check` is green.
 
 ---
 
@@ -328,11 +338,11 @@ verification.
 
 ### Acceptance criteria
 
-- [ ] `make query Q="..."` prints top-k hits with rank, distance, citation, and snippet,
+- [x] `make query Q="..."` prints top-k hits with rank, distance, citation, and snippet,
       using the pinned model and distance operator; `--top-k` overrides the default of 5.
 - [ ] The full pipeline runs clean on the real corpus, and hand-written questions return
       plausible §§; questions, hits, and date are recorded in `docs/stages/load.md`.
-- [ ] Formatting/argument tests run without model or DB; `make check` is green.
+- [x] Formatting/argument tests run without model or DB; `make check` is green.
 
 ---
 
@@ -374,15 +384,15 @@ roadmap Phase 3 heading flips to ✅.
 
 ### Acceptance criteria
 
-- [ ] Both theory chapters exist, are concise, cover their concepts exactly once, and are
+- [x] Both theory chapters exist, are concise, cover their concepts exactly once, and are
       cross-linked both ways (docstrings → chapters; chapters → code + contracts).
-- [ ] `docs/concepts.md`'s Vector embedding, Dense embedding, Embedding normalization,
+- [x] `docs/concepts.md`'s Vector embedding, Dense embedding, Embedding normalization,
       Vector database, ANN, HNSW, IVF, and Vector quantization rows link to the chapters; no
       concept is added, moved, or dropped.
 - [ ] README: Phase 3 row ✅ with a clean-checkout verification date; quick start includes
       `make embed` and `make load` and states the model-download cost; pipeline overview and
       structure table updated; every relative link resolves.
-- [ ] AGENTS.md lists the new commands and the pinned embedding model; roadmap Phase 3
+- [x] AGENTS.md lists the new commands and the pinned embedding model; roadmap Phase 3
       heading marked ✅.
-- [ ] Definition-of-done audit against AGENTS.md rule 5 passes — code + tests + theory
+- [x] Definition-of-done audit against AGENTS.md rule 5 passes — code + tests + theory
       chapters + stage contracts + README status with date all present; `make check` green.
