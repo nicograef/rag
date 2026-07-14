@@ -10,6 +10,9 @@ dependencies = [
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
     "sentence-transformers>=5.6.0",
+    # Direct dependency only so the CPU-only index pin below applies (uv sources
+    # don't reach transitive packages); imported via sentence-transformers.
+    "torch>=2.13.0",
 ]
 
 [dependency-groups]
@@ -19,6 +22,16 @@ dev = [
   "ruff>=0.9",
   "ty>=0.0.58",
 ]
+
+# CPU-only torch: the playbook is CPU-only by design; the default PyPI wheels bundle
+# multi-GB CUDA libraries this project never uses.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

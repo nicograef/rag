@@ -62,8 +62,10 @@ Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker w
 Compose plugin, and Python 3.12 (uv installs one if missing).
 
 **First-run costs** (deps and model measured 2026-07-14, image/corpus 2026-07-11/12):
-~5 GB of Python dependencies (PyTorch, pulled in by sentence-transformers, dominates —
-the dev tools alone are ~65 MB), a one-time ~160 MB (compressed) pull of the
+~1.2 GB of Python dependencies (PyTorch dominates even as the CPU-only build — torch is
+pinned to the PyTorch CPU wheel index in `pyproject.toml`, which avoids the ~4 GB of
+CUDA libraries the default PyPI wheels bundle; the dev tools alone are ~65 MB), a
+one-time ~160 MB (compressed) pull of the
 `pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
 four-law MVP corpus, and a one-time **~4.6 GB download of the pinned embedding model**
 (`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed` — the 2.27 GB
