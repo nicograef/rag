@@ -96,13 +96,26 @@ uv run python -m rag.query "<question>"                            # options: --
 It embeds the question with the same pinned model and prints the top-k rows ordered by
 `embedding <=> query` — rank, cosine distance, citation, and a text snippet per hit.
 
-**Spot-check: pending.** The implementing cloud session (2026-07-14) could not download
-the pinned model or fetch the live corpus (egress policy), so the dated hand-written-query
-spot-check could not be recorded yet. It requires one local run of the full pipeline
-(`make fetch && make convert && make chunk && make embed && make load`), then `make query`
-with questions whose expected §§ are known (e.g. a Kassen question → KassenSichV §§, a
-Steuer question → AO/UStG §§, a Grundrechte question → GG Art); record questions, top
-hits, and date here.
+**Spot-check (2026-07-14):** run against a store filled by the full pipeline on the live
+corpus that day (`make fetch && make convert && make chunk && make embed && make load`,
+1,225 chunks). Four hand-written questions with known expected §§ — **all four returned
+the expected § at rank 1** (distance = cosine, lower is better):
+
+| Question | Expected | Top hits (rank · distance · citation) |
+| --- | --- | --- |
+| „Wie müssen elektronische Kassen vor Manipulation geschützt werden?" | KassenSichV §§ / AO § 146a | 1 · 0.4013 · **§ 146a AO** — 2 · 0.4477 · § 146 AO — 3 · 0.4647 · § 146b AO |
+| „Wann entsteht die Umsatzsteuer?" | UStG § 13 | 1 · 0.3185 · **§ 13 UStG** — 2 · 0.3357 · § 13b UStG — 3 · 0.3417 · § 26 UStG |
+| „Ist die Würde des Menschen antastbar?" | GG Art 1 | 1 · 0.4350 · **Art 1, Art 2 GG** — 2 · 0.5621 · Art 4 GG — 3 · 0.5674 · § 380 AO |
+| „Wer ist zum Vorsteuerabzug berechtigt?" | UStG § 15 | 1 · 0.3795 · **§ 15 UStG** — 2 · 0.3870 · § 18 UStG — 3 · 0.3982 · § 15 UStG |
+
+Honest reading: the rank-1 hits are exactly the expected norms, and for the Vorsteuer
+question four of the top five hits are parts of § 15 UStG. Two caveats worth recording:
+the Kassen question surfaces only the AO anchor norms — no KassenSichV chunk reaches the
+top 5, plausibly because the question's vocabulary matches § 146a's text more directly;
+and the Grundrechte question shows the domain skew of the corpus — ranks 3–4 are
+AO Ordnungswidrigkeiten noise, though the distance gap to rank 1 (0.435 vs ≥ 0.56) is
+clear. Anecdotal plausibility only — no thresholds, no metrics; the evaluation harness is
+Backlog 1.
 
 ## Downstream consumers
 
