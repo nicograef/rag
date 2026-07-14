@@ -233,6 +233,64 @@ explicitly instead of implicitly.
   entries (CDC, chunk-level permissions, multimodal embeddings, human-feedback loops, …)
   are recorded with rationale so they are decisions, not omissions.
 
+**Embedding model — BAAI/bge-m3** (decided 2026-07-14): the model, embedding
+normalization, and pgvector distance operator, pinned together for Phase 3 and everything
+downstream.
+
+- **Context:** Phase 3 needs an open-license, multilingual, CPU-capable
+  sentence-transformers model; the choice fixes the vector dimension, normalization, and
+  distance operator for the store, and Phase 4 embeds questions with the same model.
+  Candidates per roadmap: the multilingual-e5 family, jina-embeddings-v2-base-de, bge-m3.
+  All facts below were verified live 2026-07-14 — primary reachable sources: the official
+  MTEB model metadata and results repos, microsoft/unilm (E5), FlagOpen/FlagEmbedding
+  (bge-m3); huggingface.co was unreachable from the implementing session (egress policy),
+  so model-card claims were corroborated via the MTEB metadata and search snippets.
+- **Choice:** **`BAAI/bge-m3`** — MIT license, 568 M parameters (≈ 2.2 GB fp32), dense
+  dimension **1024**, input limit **8192 tokens**, no query/passage prefixes. Vectors are
+  **normalized** (the model's own default; its README scores by inner product of normalized
+  vectors, i.e. cosine), so the pinned pgvector operator is **cosine distance `<=>`** with
+  an HNSW index on `vector_cosine_ops` (pgvector defaults `m=16`, `ef_construction=64` —
+  no reason to deviate at MVP corpus scale). The values live as constants in
+  [`src/rag/embed/`](../src/rag/embed/__init__.py) and [`src/rag/load/`](../src/rag/load/__init__.py).
+- **Why bge-m3:**
+  - **Chunk fit.** The Phase 2 chunk size (2000 chars ≈ 500–700 XLM-RoBERTa tokens for
+    German prose; the one atomic 13 k-char table ≈ 5 k tokens) fits 8192 tokens with 4–8×
+    headroom even at a conservative 2 chars/token — no chunk-stage change, no silent
+    truncation. The e5 family's 512-token cap would truncate the largest chunks or force a
+    token-measured re-chunk.
+  - **German retrieval, verified.** Best verified German score among the candidates:
+    MIRACL-de dense nDCG@10 **56.7** vs multilingual-e5-large 56.4, -base 52.1, -small 48.8
+    (bge-m3 paper Table 1 as corrected 2024-07-01, table image in the FlagEmbedding repo;
+    e5 numbers from the MTEB results repo).
+  - **One code path.** No `query:`/`passage:` prefixes ("no longer requires adding
+    instructions to the queries" — bge-m3 README), so ingest and question embedding share
+    one interface with nothing to get wrong between them.
+  - **Late chunking stays live.** bge-m3 is the only candidate exposing token-level
+    (ColBERT) vectors and sparse lexical weights from the same pass — the Backlog 6
+    late-chunking condition is met, and built-in hybrid scoring is a future option.
+- **Alternatives weighed:** `multilingual-e5-base` — the family's best size/quality ratio
+  (278 M, MIRACL-de 52.1) and strong GermanQuAD (nDCG@10 0.94), but the 512-token cap
+  conflicts with the Phase 2 chunk size and the required prefixes split the embedding code
+  path; `jina-embeddings-v2-base-de` — the right shape (8192 tokens, 161 M, Apache-2.0)
+  but its German benchmark numbers could not be verified from any reachable primary source
+  (absent from the MTEB results repo) — rejected as unverifiable, not as deficient;
+  `multilingual-e5-small/large` — same 512-token cap, small measurably weaker, large costs
+  as much as bge-m3 without its features. Sobering context: every e5 size collapses on the
+  legal-domain GerDaLIR benchmark (nDCG@10 0.065–0.157, and larger is not better) — dense
+  retrieval has a domain ceiling here, and the recorded answer is hybrid BM25 + RRF
+  (Backlog 2), not a bigger dense model.
+- **16 GB floor & measurements:** published fp32 footprint ≈ 2.2 GB plus runtime overhead
+  leaves clear room next to Postgres and Phase 4's planned 7–8B quantized GGUF (≈ 5 GB).
+  **On-machine numbers are pending:** the implementing cloud session could not download
+  the model (huggingface.co blocked by the session's egress policy), so embedding
+  throughput, peak memory, and the exact tokenizer check on real chunks still need one
+  local run — run `make embed` on the target machine and append the measured numbers and
+  date here. First-run model download ≈ 2.3 GB.
+- **Consequences:** the `chunks.embedding` column is `vector(1024)`; question embedding in
+  Phase 4 must use the same pinned model; retrieval-quality claims stay anecdotal until the
+  evaluation harness (Backlog 1); the model download cost is stated in the README quick
+  start.
+
 **Corpus licensing — gesetze-im-internet.de** (verified live 2026-07-12): only the
 normative law texts enter the corpus; footnotes and editorial apparatus stay out.
 
