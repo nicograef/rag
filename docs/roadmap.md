@@ -279,13 +279,25 @@ downstream.
   legal-domain GerDaLIR benchmark (nDCG@10 0.065–0.157, and larger is not better) — dense
   retrieval has a domain ceiling here, and the recorded answer is hybrid BM25 + RRF
   (Backlog 2), not a bigger dense model.
-- **16 GB floor & measurements:** published fp32 footprint ≈ 2.2 GB plus runtime overhead
-  leaves clear room next to Postgres and Phase 4's planned 7–8B quantized GGUF (≈ 5 GB).
-  **On-machine numbers are pending:** the implementing cloud session could not download
-  the model (huggingface.co blocked by the session's egress policy), so embedding
-  throughput, peak memory, and the exact tokenizer check on real chunks still need one
-  local run — run `make embed` on the target machine and append the measured numbers and
-  date here. First-run model download ≈ 2.3 GB.
+- **16 GB floor & measurements** (measured 2026-07-14 on a 4-core Intel Xeon @ 2.80 GHz,
+  16 GB RAM, CPU-only — a `make embed` run over the full four-law corpus, 1,225 chunks):
+  - **Throughput:** 17 min 26 s wall with the model cached — ≈ **1.2 chunks/s**; the first
+    run including the model download took 18 min 30 s.
+  - **Peak memory:** ≈ **9.1 GiB** peak RSS of the embed process (`/usr/bin/time -v`,
+    both runs within 1 %) — CPU batch inference over sequences up to 3,784 tokens, well
+    above the idle fp32 footprint. Fits the 16 GB floor with ≈ 6.5 GiB headroom, and the
+    peak is confined to offline ingestion: the online path embeds one short question at a
+    time, so it never coexists with Phase 4's ≈ 5 GB LLM at this level.
+  - **Download size:** the weights are 2.27 GB, but the first `make embed` filled
+    `~/.cache/huggingface/` with **≈ 4.6 GB** — sentence-transformers resolved
+    `pytorch_model.bin` (2.27 GB) and transformers additionally fetched the safetensors
+    conversion from its own snapshot (2.27 GB), so the weights land twice. The README
+    states the measured total.
+  - **Tokenizer check on real chunks:** all 1,225 chunk texts through the model's own
+    tokenizer (`XLMRobertaTokenizer`): min 11 / median 256 / max **3,784** tokens —
+    **zero chunks above the 8,192-token limit**. The max is the atomic 13,011-char
+    UStG "Anlage 2" table chunk (the entry's ≈ 5 k-token estimate above was
+    conservative); the Phase 2 chunk size is confirmed, no chunk-stage change needed.
 - **Consequences:** the `chunks.embedding` column is `vector(1024)`; question embedding in
   Phase 4 must use the same pinned model; retrieval-quality claims stay anecdotal until the
   evaluation harness (Backlog 1); the model download cost is stated in the README quick
