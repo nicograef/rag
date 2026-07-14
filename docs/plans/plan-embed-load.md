@@ -3,15 +3,14 @@
 > Source PRD: [../prds/prd-embed-load.md](../prds/prd-embed-load.md) ·
 > Roadmap phase: [../roadmap.md](../roadmap.md) "Phase 3 — Embed & load (vector store)"
 
-> **Implementation status (2026-07-14):** all five slices landed. The unchecked boxes
-> below share one cause: the implementing cloud session's egress policy blocked
-> huggingface.co (no model download) and gesetze-im-internet.de (no live corpus), so the
-> on-machine model measurements, the tokenizer check on real chunks, the real-model
-> reference-vector run (`tests/pin_reference_vectors.py`), the full-corpus run, and the
-> retrieval spot-check need one local session. Where each result belongs is written into
-> the artifacts: the roadmap decision entry, `docs/stages/load.md#verification`, and the
-> README verification line. DB behavior was fully verified against a local
-> Postgres 16 + pgvector (apt) because the Docker image CDN was also blocked.
+> **Completed (2026-07-14):** all five slices landed, and the verification items the
+> implementing session had to leave pending (blocked egress to huggingface.co,
+> gesetze-im-internet.de, and the Docker image CDN) were completed the same day in a
+> session with full network access: real full-corpus pipeline run against the Compose
+> Postgres 17 + pgvector, on-machine model measurements and the tokenizer check
+> (roadmap decision entry), pinned real-model reference vectors (integration test
+> passes), retrieval spot-check (`docs/stages/load.md#verification`), and the README
+> clean-checkout verification claim.
 
 ## Goal
 
@@ -203,10 +202,10 @@ condition).
 
 ### Acceptance criteria
 
-- [ ] A dated decision entry in `docs/roadmap.md` pins model + normalization + distance
+- [x] A dated decision entry in `docs/roadmap.md` pins model + normalization + distance
       operator together, with license verification, benchmark citations, measured CPU
       throughput and memory from this machine, and the late-chunking note.
-- [ ] The Phase 2 chunk size is confirmed against the chosen model's tokenizer on real
+- [x] The Phase 2 chunk size is confirmed against the chosen model's tokenizer on real
       chunks (or the required `max_chars` adjustment is recorded in the entry and applied to
       the chunk stage with re-pinned golden files before Slice 2 starts).
 - [x] `sentence-transformers` is added and `make check` is green — no stage code yet.
@@ -250,7 +249,7 @@ when the model cache is absent).
 - [x] `make embed` turns every `data/chunks/<slug>.jsonl` into
       `data/embeddings/<slug>.jsonl`, one self-describing record per chunk, order preserved;
       missing/empty chunks dir exits non-zero with a "run `make chunk` first" hint.
-- [ ] Golden-file tests with the fake embedder pass byte-exactly and run without torch, a
+- [x] Golden-file tests with the fake embedder pass byte-exactly and run without torch, a
       model download, or network; the real-model reference-vector test passes locally within
       tolerance and skips cleanly elsewhere.
 - [x] `docs/stages/embed.md` documents invocation, input, artifact schema, guarantees,
@@ -340,7 +339,7 @@ verification.
 
 - [x] `make query Q="..."` prints top-k hits with rank, distance, citation, and snippet,
       using the pinned model and distance operator; `--top-k` overrides the default of 5.
-- [ ] The full pipeline runs clean on the real corpus, and hand-written questions return
+- [x] The full pipeline runs clean on the real corpus, and hand-written questions return
       plausible §§; questions, hits, and date are recorded in `docs/stages/load.md`.
 - [x] Formatting/argument tests run without model or DB; `make check` is green.
 
@@ -389,7 +388,7 @@ roadmap Phase 3 heading flips to ✅.
 - [x] `docs/concepts.md`'s Vector embedding, Dense embedding, Embedding normalization,
       Vector database, ANN, HNSW, IVF, and Vector quantization rows link to the chapters; no
       concept is added, moved, or dropped.
-- [ ] README: Phase 3 row ✅ with a clean-checkout verification date; quick start includes
+- [x] README: Phase 3 row ✅ with a clean-checkout verification date; quick start includes
       `make embed` and `make load` and states the model-download cost; pipeline overview and
       structure table updated; every relative link resolves.
 - [x] AGENTS.md lists the new commands and the pinned embedding model; roadmap Phase 3

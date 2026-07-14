@@ -17,7 +17,8 @@ make embed                      # wraps:
 uv run python -m rag.embed      # options: --chunks-dir data/chunks --embeddings-dir data/embeddings
 ```
 
-The first run downloads the pinned model (≈ 2.3 GB) into the Hugging Face cache
+The first run downloads the pinned model (≈ 4.6 GB, measured 2026-07-14 — the 2.27 GB
+weights land twice; see the model decision in the roadmap) into the Hugging Face cache
 (`~/.cache/huggingface/`); afterwards the stage is offline. Embedding runs in batches on
 CPU; per-law progress is printed to stdout.
 

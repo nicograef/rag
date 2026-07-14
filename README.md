@@ -34,14 +34,11 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ⬜     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-Quick start last verified from a clean checkout: **2026-07-12** (Phases 0–2: all steps,
-including the `make db` image download and a live `make fetch && make convert && make
-chunk`). Phase 3 verified **2026-07-14** via the test suite against a live Postgres +
-pgvector (schema, HNSW index, idempotent re-runs, pruning); the full quick start
-including the model download and a live retrieval spot-check still needs one
-clean-checkout re-run — the implementing environment could not reach huggingface.co (see
-the [model decision](docs/roadmap.md#decisions) and
-[load contract](docs/stages/load.md#verification)).
+Quick start last verified from a clean checkout: **2026-07-14** — every step below as
+written: dev setup, `make db` including the image pull, `make check`, the full pipeline
+on the live corpus (`make fetch` through `make load`, 1,225 chunks — the first
+`make embed` including the model download), and a `make query` retrieval spot-check
+(recorded in the [load contract](docs/stages/load.md#verification)).
 
 ## Quick start
 
@@ -56,7 +53,7 @@ make check                        # lint + types + tests
 make fetch                        # download the law XML (~0.4 MB) into data/raw/
 make convert                      # convert it into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
-make embed                        # embed the chunks (first run downloads the ~2.3 GB model)
+make embed                        # embed the chunks (first run downloads the model, ~4.6 GB)
 make load                        # fill the chunks table + HNSW index in Postgres
 make query Q="Wie müssen elektronische Kassen gesichert werden?"   # verify retrieval
 ```
@@ -64,15 +61,16 @@ make query Q="Wie müssen elektronische Kassen gesichert werden?"   # verify ret
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
 Compose plugin, and Python 3.12 (uv installs one if missing).
 
-**First-run costs** (deps measured 2026-07-14, image/corpus 2026-07-11/12): ~5 GB of
-Python dependencies (PyTorch, pulled in by sentence-transformers, dominates — the dev
-tools alone are ~65 MB), a one-time ~160 MB (compressed) pull of the
+**First-run costs** (deps and model measured 2026-07-14, image/corpus 2026-07-11/12):
+~5 GB of Python dependencies (PyTorch, pulled in by sentence-transformers, dominates —
+the dev tools alone are ~65 MB), a one-time ~160 MB (compressed) pull of the
 `pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
-four-law MVP corpus, and a one-time **~2.3 GB download of the pinned embedding model**
-(`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed`. **Phase 4 adds
-more** — open-weight LLM weights via Ollama. Those costs are documented here when their
-phases land; until the status table above marks a phase ✅, its downloads and commands
-don't exist yet.
+four-law MVP corpus, and a one-time **~4.6 GB download of the pinned embedding model**
+(`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed` — the 2.27 GB
+weights land twice, as `pytorch_model.bin` plus the safetensors conversion (details in
+the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds more** — open-weight
+LLM weights via Ollama. Those costs are documented here when their phases land; until
+the status table above marks a phase ✅, its downloads and commands don't exist yet.
 
 ## Pipeline overview
 
