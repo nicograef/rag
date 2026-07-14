@@ -13,7 +13,7 @@ setup:         ## Install dependencies into .venv (uv sync)
 
 # ── Pipeline (offline ingestion) ──
 
-.PHONY: fetch convert chunk embed
+.PHONY: fetch convert chunk embed load
 
 fetch:         ## Download law XML from gesetze-im-internet.de into data/raw/
 	uv run python -m rag.fetch
@@ -26,6 +26,9 @@ chunk:         ## Chunk corpus Markdown into JSONL records under data/chunks/
 
 embed:         ## Embed chunk records into vector JSONL under data/embeddings/
 	uv run python -m rag.embed
+
+load:          ## Load chunks + embeddings into Postgres/pgvector (needs `make db`)
+	uv run python -m rag.load
 
 # ── Code Quality ──
 
