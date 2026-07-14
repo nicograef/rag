@@ -35,3 +35,6 @@ extend-select = ["I", "B", "UP", "N"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "integration: needs the real model cache or a reachable database; skips cleanly when unavailable",
+]
