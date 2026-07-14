@@ -30,38 +30,49 @@ in the [roadmap](docs/roadmap.md).
 | 0 — Scaffold                         | — (repo, tooling, database)             | ✅     |
 | 1 — Fetch & convert                  | fetch, convert                          | ✅     |
 | 2 — Structure-aware chunking         | chunk                                   | ✅     |
-| 3 — Embed & load                     | embed, load                             | ⬜     |
+| 3 — Embed & load                     | embed, load                             | ✅     |
 | 4 — Online PoC                       | retrieve, assemble, generate            | ⬜     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-Quick start last verified from a clean checkout: **2026-07-12** (all steps, including the
-`make db` image download and a live `make fetch && make convert && make chunk`).
+Quick start last verified from a clean checkout: **2026-07-12** (Phases 0–2: all steps,
+including the `make db` image download and a live `make fetch && make convert && make
+chunk`). Phase 3 verified **2026-07-14** via the test suite against a live Postgres +
+pgvector (schema, HNSW index, idempotent re-runs, pruning); the full quick start
+including the model download and a live retrieval spot-check still needs one
+clean-checkout re-run — the implementing environment could not reach huggingface.co (see
+the [model decision](docs/roadmap.md#decisions) and
+[load contract](docs/stages/load.md#verification)).
 
 ## Quick start
 
-What runs today (Phases 0–2): the dev setup, the checks, the database, and the first three
-pipeline stages.
+What runs today (Phases 0–3): the dev setup, the checks, the database, and the whole
+offline ingestion pipeline.
 
 ```bash
-bash scripts/setup-dev-tools.sh   # install uv + sync Python dev dependencies (idempotent)
+bash scripts/setup-dev-tools.sh   # install uv + sync Python dependencies (idempotent)
 cp .env.example .env              # then fill in POSTGRES_PASSWORD
 make db                           # start Postgres 17 + pgvector (Docker Compose)
 make check                        # lint + types + tests
 make fetch                        # download the law XML (~0.4 MB) into data/raw/
 make convert                      # convert it into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
+make embed                        # embed the chunks (first run downloads the ~2.3 GB model)
+make load                        # fill the chunks table + HNSW index in Postgres
+make query Q="Wie müssen elektronische Kassen gesichert werden?"   # verify retrieval
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
 Compose plugin, and Python 3.12 (uv installs one if missing).
 
-**First-run costs** (measured 2026-07-11, corpus 2026-07-12): ~65 MB of Python dev
-dependencies (ruff, ty, pytest) plus uv's download cache, a one-time ~160 MB (compressed)
-pull of the `pgvector/pgvector:pg17` image, and ~0.4 MB zipped (~1.8 MB extracted) of law
-XML for the four-law MVP corpus. **Future phases add multi-gigabyte downloads** — an
-embedding model (Phase 3) and open-weight LLM weights via Ollama (Phase 4). Those costs are
-documented here when their phases land; until the status table above marks a phase ✅, its
-downloads and commands don't exist yet.
+**First-run costs** (deps measured 2026-07-14, image/corpus 2026-07-11/12): ~5 GB of
+Python dependencies (PyTorch, pulled in by sentence-transformers, dominates — the dev
+tools alone are ~65 MB), a one-time ~160 MB (compressed) pull of the
+`pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
+four-law MVP corpus, and a one-time **~2.3 GB download of the pinned embedding model**
+(`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed`. **Phase 4 adds
+more** — open-weight LLM weights via Ollama. Those costs are documented here when their
+phases land; until the status table above marks a phase ✅, its downloads and commands
+don't exist yet.
 
 ## Pipeline overview
 
@@ -74,8 +85,8 @@ on disk or database state:
 | **[fetch](docs/stages/fetch.md)**     | acquire the source      | source → raw files (official law XML) |
 | **[convert](docs/stages/convert.md)** | make the source workable | raw files → clean Markdown corpus    |
 | **[chunk](docs/stages/chunk.md)**     | slice into retrieval units | corpus → chunk records with metadata  |
-| **embed**   | turn text into vectors          | chunk records → vectors                          |
-| **load**    | own the database (incl. schema and indexes) | chunk records + vectors → database   |
+| **[embed](docs/stages/embed.md)**     | turn text into vectors  | chunk records → vectors (JSONL per law) |
+| **[load](docs/stages/load.md)**       | own the database (incl. schema and indexes) | chunk records + vectors → database |
 
 The **online path** answers a question in one process. Its contract is a documented entry
 point plus step-level logs of every intermediate (query, retrieved chunks with scores,
@@ -91,13 +102,15 @@ assembled prompt, answer):
 set plus a pinned configuration in, a dated metrics report out.
 
 Each stage's precise contract (`docs/stages/<stage>.md`) and its theory chapter
-(`docs/theory/<building-block>.md`) land with the phase that implements it — fetch,
-convert, and chunk's contracts are linked above. The Phase 1 chapter,
+(`docs/theory/<building-block>.md`) land with the phase that implements it — the five
+offline contracts are linked above. The Phase 1 chapter,
 [corpus & parsing](docs/theory/corpus-and-parsing.md), explains why corpus choice,
 licensing, and lossless parsing are RAG decisions; the Phase 2 chapter,
 [chunking](docs/theory/chunking.md), explains why chunk size matters and why
-structure-aware chunking beats fixed-size splitting for law texts. See the status table
-above for what exists today.
+structure-aware chunking beats fixed-size splitting for law texts; the Phase 3 chapters,
+[embeddings](docs/theory/embeddings.md) and
+[vector indexes](docs/theory/vector-indexes.md), explain how meaning becomes geometry and
+how HNSW searches it fast. See the status table above for what exists today.
 The [concept map](docs/concepts.md) indexes every RAG concept the playbook tracks — a
 one-line definition each, plus where it lives: a phase, a backlog item, a theory chapter,
 or a recorded reason it is deliberately out of scope.
@@ -140,7 +153,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/prds/`         | PRDs: product big picture (playbook) and per-phase feature PRDs  |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
-| `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`) — gitignored, re-runnable |
+| `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`), embeddings (`data/embeddings/`) — gitignored, re-runnable |
 | `laws.toml`          | Corpus config: one entry per law to fetch                        |
 | `docker-compose.yml` | Postgres 17 + pgvector dev stack                                 |
 | `Makefile`           | Dev interface (`make help`)                                      |

@@ -47,7 +47,7 @@ Goal: split the Markdown corpus into retrieval units without destroying legal st
   and why structure-aware beats fixed-size for law texts.
 - Later candidates: see backlog item 6 (advanced chunking strategies).
 
-## Phase 3 — Embed & load (vector store) ⬜
+## Phase 3 — Embed & load (vector store) ✅
 
 Stages: **embed**, **load**
 
