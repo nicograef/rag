@@ -26,6 +26,7 @@ from pgvector import Vector
 from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
 
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR
 from rag.embed import EMBEDDING_DIM
 
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
@@ -208,10 +209,10 @@ def main(argv: list[str] | None = None) -> int:
         description="Load chunk records and embeddings into the Postgres/pgvector store.",
     )
     parser.add_argument(
-        "--chunks-dir", type=Path, default=Path("data/chunks"), help="chunk records directory"
+        "--chunks-dir", type=Path, default=CHUNKS_DIR, help="chunk records directory"
     )
     parser.add_argument(
-        "--embeddings-dir", type=Path, default=Path("data/embeddings"), help="embeddings directory"
+        "--embeddings-dir", type=Path, default=EMBEDDINGS_DIR, help="embeddings directory"
     )
     args = parser.parse_args(argv)
 

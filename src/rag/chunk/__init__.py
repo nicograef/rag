@@ -26,6 +26,8 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from rag import CHUNKS_DIR, CORPUS_DIR
+
 # Front matter fields the chunk stage consumes (the rest — title, builddate — are ignored).
 SLUG_KEY = "slug"
 LAW_KEY = "abbreviation"
@@ -545,12 +547,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m rag.chunk",
         description="Chunk law Markdown from data/corpus/ into JSONL under data/chunks/.",
     )
-    parser.add_argument(
-        "--corpus-dir", type=Path, default=Path("data/corpus"), help="input directory"
-    )
-    parser.add_argument(
-        "--chunks-dir", type=Path, default=Path("data/chunks"), help="output directory"
-    )
+    parser.add_argument("--corpus-dir", type=Path, default=CORPUS_DIR, help="input directory")
+    parser.add_argument("--chunks-dir", type=Path, default=CHUNKS_DIR, help="output directory")
     args = parser.parse_args(argv)
 
     corpus_files = sorted(args.corpus_dir.glob("*.md")) if args.corpus_dir.is_dir() else []

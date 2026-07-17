@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR
+
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
 # model, normalization, and pgvector distance operator are chosen together — the reasoning
 # lives in the decision entry, the values live here.
@@ -114,11 +116,9 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
         prog="python -m rag.embed",
         description="Embed chunk records from data/chunks/ into JSONL under data/embeddings/.",
     )
+    parser.add_argument("--chunks-dir", type=Path, default=CHUNKS_DIR, help="input directory")
     parser.add_argument(
-        "--chunks-dir", type=Path, default=Path("data/chunks"), help="input directory"
-    )
-    parser.add_argument(
-        "--embeddings-dir", type=Path, default=Path("data/embeddings"), help="output directory"
+        "--embeddings-dir", type=Path, default=EMBEDDINGS_DIR, help="output directory"
     )
     args = parser.parse_args(argv)
 

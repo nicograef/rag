@@ -22,6 +22,8 @@ from pathlib import Path
 
 from lxml import etree
 
+from rag import CORPUS_DIR, RAW_DIR
+
 # Footnote references: their markers are dropped per the licensing decision.
 INLINE_IGNORED = {"FnR"}
 
@@ -516,10 +518,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m rag.convert",
         description="Convert fetched law XML from data/raw/ into Markdown under data/corpus/.",
     )
-    parser.add_argument("--raw-dir", type=Path, default=Path("data/raw"), help="input directory")
-    parser.add_argument(
-        "--corpus-dir", type=Path, default=Path("data/corpus"), help="output directory"
-    )
+    parser.add_argument("--raw-dir", type=Path, default=RAW_DIR, help="input directory")
+    parser.add_argument("--corpus-dir", type=Path, default=CORPUS_DIR, help="output directory")
     args = parser.parse_args(argv)
 
     if not args.raw_dir.is_dir():

@@ -22,6 +22,8 @@ from pathlib import Path
 
 import httpx
 
+from rag import RAW_DIR
+
 DOWNLOAD_URL = "https://www.gesetze-im-internet.de/{slug}/xml.zip"
 TIMEOUT_SECONDS = 30.0
 
@@ -77,7 +79,7 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
         description="Download law XML from gesetze-im-internet.de into data/raw/.",
     )
     parser.add_argument("--config", type=Path, default=Path("laws.toml"), help="law list (TOML)")
-    parser.add_argument("--raw-dir", type=Path, default=Path("data/raw"), help="output directory")
+    parser.add_argument("--raw-dir", type=Path, default=RAW_DIR, help="output directory")
     args = parser.parse_args(argv)
 
     laws = load_laws(args.config)
