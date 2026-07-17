@@ -28,6 +28,11 @@ class Prompt:
     system: str
     user: str
 
+    @property
+    def char_count(self) -> int:
+        """Prompt size in characters — the one definition the budget check and the ask log share."""
+        return len(self.system) + len(self.user)
+
 
 # Wording refined against real model behaviour in the 2026-07-17 spot-check
 # (docs/stages/generate.md, "Verification"): the partial-answer directive counters
@@ -74,11 +79,12 @@ def assemble(question: str, chunks: Sequence[RetrievedChunk]) -> Prompt:
     ]
     user = "Auszüge aus Gesetzestexten:\n\n" + "\n\n".join(blocks) + f"\n\nFrage: {question}"
 
-    size = len(SYSTEM_PROMPT) + len(user)
+    prompt = Prompt(system=SYSTEM_PROMPT, user=user)
+    size = prompt.char_count
     if size > MAX_PROMPT_CHARS:
         raise AssembleError(
             f"prompt is {size} characters, over the {MAX_PROMPT_CHARS}-character context "
             f"budget ({NUM_CTX} num_ctx minus {GENERATION_RESERVE_TOKENS} answer-reserve "
             f"tokens at {CHARS_PER_TOKEN_FLOOR} chars/token) — retry with a smaller --top-k"
         )
-    return Prompt(system=SYSTEM_PROMPT, user=user)
+    return prompt

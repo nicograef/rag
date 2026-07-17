@@ -91,10 +91,9 @@ def test_law_fixture_is_deterministic(slug: str, tmp_path: Path) -> None:
 def _split_parts_for(slug: str, max_chars: int) -> tuple[NormUnit, list[SplitPart]]:
     """The ordered `SplitPart`s of a fixture's single oversized unit (test helper)."""
     lines = (FIXTURES / "corpus" / f"{slug}.md").read_text(encoding="utf-8").splitlines()
-    parse_front_matter(lines)
-    closing = lines.index("---", 1)
-    (unit,) = [u for u in parse_norm_units(lines[closing + 1 :]) if u.body]
-    return unit, _split_body(unit.body, unit.heading, unit.unit, max_chars)
+    _fields, body_start = parse_front_matter(lines)
+    (unit,) = [u for u in parse_norm_units(lines[body_start:]) if u.body]
+    return unit, _split_body(unit.body, unit.heading, max_chars)
 
 
 @pytest.mark.parametrize("slug", ["splitg", "absatzg"])

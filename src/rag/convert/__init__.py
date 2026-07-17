@@ -155,7 +155,7 @@ def _render_norm(norm: etree._Element, section_depth: int) -> tuple[list[str], i
     the section depth to 1 and render at depth 2.
     """
     if norm.find("metadaten/gliederungseinheit") is not None:
-        return _render_section(norm), _section_depth(norm)
+        return _render_section(norm)
 
     enbez = norm.findtext("metadaten/enbez")
     if enbez is None:
@@ -190,8 +190,11 @@ def _section_depth(norm: etree._Element) -> int:
     return depth
 
 
-def _render_section(norm: etree._Element) -> list[str]:
-    """A ``<gliederungseinheit>`` section → one heading; its body must render empty."""
+def _render_section(norm: etree._Element) -> tuple[list[str], int]:
+    """A ``<gliederungseinheit>`` section → its heading block and the depth it establishes.
+
+    Its body must render empty.
+    """
     if norm.find("metadaten/enbez") is not None:
         raise ConversionError("section norm unexpectedly has an <enbez>")
     ge = norm.find("metadaten/gliederungseinheit")
@@ -207,7 +210,8 @@ def _render_section(norm: etree._Element) -> list[str]:
     content = norm.find("textdaten/text/Content")
     if content is not None and _render_content(content, heading):
         raise ConversionError(f"section norm {heading!r} has a non-empty body")
-    return [f"{'#' * _section_depth(norm)} {heading}"]
+    depth = _section_depth(norm)
+    return [f"{'#' * depth} {heading}"], depth
 
 
 def _render_content(content: etree._Element, context: str) -> list[str]:

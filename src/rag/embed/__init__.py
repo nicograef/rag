@@ -159,7 +159,7 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
     jobs = [
         (
             chunks_file.stem,
-            lambda chunks_file=chunks_file, embedder=embedder: (
+            lambda chunks_file=chunks_file: (
                 f"→ {embed_law(chunks_file, args.embeddings_dir, embedder)}"
             ),
         )

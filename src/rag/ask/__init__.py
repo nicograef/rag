@@ -55,7 +55,7 @@ def _generate_via_ollama(prompt: Prompt, on_delta: Callable[[str], None]) -> Gen
 
 def _log_prompt(prompt: Prompt, *, verbose: bool) -> None:
     """Log the prompt size to stderr; with ``verbose`` also dump both messages in full."""
-    total = len(prompt.system) + len(prompt.user)
+    total = prompt.char_count
     print(
         f"prompt: {total} chars (system {len(prompt.system)}, user {len(prompt.user)})",
         file=sys.stderr,

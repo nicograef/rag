@@ -80,17 +80,21 @@ class NormUnit:
     body: str
 
 
-def parse_front_matter(lines: list[str]) -> dict[str, str]:
-    """Decode convert's ``key: "value"`` front matter (scan-based backslash unescape)."""
+def parse_front_matter(lines: list[str]) -> tuple[dict[str, str], int]:
+    """Decode convert's ``key: "value"`` front matter; return the fields and the body-start index.
+
+    The index is the first line after the closing ``---`` — the single source of the
+    front-matter boundary, so callers never re-scan for it (scan-based backslash unescape).
+    """
     if not lines or lines[0] != "---":
         raise ChunkError("missing front matter opening `---`")
     fields: dict[str, str] = {}
-    for line in lines[1:]:
+    for index, line in enumerate(lines[1:], start=1):
         if line == "---":
             missing = [key for key in REQUIRED_KEYS if key not in fields]
             if missing:
                 raise ChunkError(f"front matter missing required key(s): {', '.join(missing)}")
-            return fields
+            return fields, index + 1
         key, separator, rest = line.partition(": ")
         if not separator or not rest.startswith('"') or not rest.endswith('"'):
             raise ChunkError(f"malformed front matter line: {line!r}")
@@ -258,7 +262,10 @@ def _split_recursively(text: str, max_chars: int, separators: tuple[str, ...]) -
             buffer += token
     if buffer:
         fragments.append(buffer)
-    return [out for fragment in fragments for out in _split_recursively(fragment, max_chars, rest)]
+    result: list[str] = []
+    for fragment in fragments:
+        result.extend(_split_recursively(fragment, max_chars, rest))
+    return result
 
 
 def _char_split_absatz(
@@ -294,7 +301,7 @@ def _char_split_absatz(
     return parts
 
 
-def _split_body(body: str, heading: str, unit: str, max_chars: int) -> list[SplitPart]:
+def _split_body(body: str, heading: str, max_chars: int) -> list[SplitPart]:
     """Split an oversized unit body into ordered parts (Absatz groups + char fallback).
 
     Greedily accumulates whole Absätze into a part while heading + one-Absatz overlap +
@@ -318,9 +325,7 @@ def _split_body(body: str, heading: str, unit: str, max_chars: int) -> list[Spli
             overlap, prefix_len = "", heading_len
             if prefix_len + len(first) > max_chars:  # still overflows alone → recurse/atomic
                 leading_joiner = BLOCK_SEPARATOR if parts else ""
-                parts.extend(
-                    _split_oversized_absatz(first, heading, unit, max_chars, leading_joiner)
-                )
+                parts.extend(_split_oversized_absatz(first, heading, max_chars, leading_joiner))
                 previous_absatz = first
                 index += 1
                 continue
@@ -351,12 +356,12 @@ def _split_body(body: str, heading: str, unit: str, max_chars: int) -> list[Spli
 
 
 def _split_oversized_absatz(
-    absatz: str, heading: str, unit: str, max_chars: int, leading_joiner: str
+    absatz: str, heading: str, max_chars: int, leading_joiner: str
 ) -> list[SplitPart]:
     """Handle a single Absatz that alone overflows: keep a table whole, else char-split it."""
     if _is_table_block(absatz):
         chars = len(heading) + len(BLOCK_SEPARATOR) + len(absatz)
-        print(f"  ! oversized table in {unit}: {chars} chars (kept whole)")
+        print(f"  ! oversized table in {heading}: {chars} chars (kept whole)")
         return [
             SplitPart(
                 text=f"{heading}{BLOCK_SEPARATOR}{absatz}",
@@ -417,7 +422,7 @@ def _chunks_from_unit(unit: NormUnit, fields: dict[str, str], max_chars: int) ->
     if len(text) <= max_chars or not unit.body:
         return [_chunk(f"{slug}#{unit.unit}", text, None)]
 
-    parts = _split_body(unit.body, unit.heading, unit.unit, max_chars)
+    parts = _split_body(unit.body, unit.heading, max_chars)
     total = len(parts)
     if total == 1:  # a lone atomic oversized table needs no part numbering
         return [_chunk(f"{slug}#{unit.unit}", parts[0].text, None)]
@@ -510,10 +515,9 @@ def chunk_corpus(
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines = lines[:-1]  # the file's trailing newline is not a body line
-    fields = parse_front_matter(lines)
-    closing = lines.index("---", 1)
+    fields, body_start = parse_front_matter(lines)
 
-    units = parse_norm_units(lines[closing + 1 :])
+    units = parse_norm_units(lines[body_start:])
     chunks: list[Chunk] = []
     seen_ids: set[str] = set()
     for chunk in _chunks_from_units(units, fields, max_chars, merge_floor):
