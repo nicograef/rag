@@ -34,6 +34,13 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
+> **Corpus pivot in progress (fetch & convert verified 2026-07-17):** the **fetch** and
+> **convert** stages now build an **English Wikipedia** corpus (the 20 current Premier League
+> clubs, `clubs.toml`), verified end to end with `make fetch` + `make convert` over all 20
+> articles. Chunking, embed & load, and the online path pivot in later slices — so the
+> quick-start figures and corpus framing below still describe the previous run until the
+> wrap-up slice re-verifies the whole loop.
+
 Quick start last verified from a clean checkout: **2026-07-14** — every step below as
 written: dev setup, `make db` including the image pull, `make check`, the full pipeline
 on the live corpus (`make fetch` through `make load`, 1,225 chunks — the first
@@ -171,7 +178,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`), embeddings (`data/embeddings/`) — gitignored, re-runnable |
-| `laws.toml`          | Corpus config: one entry per law to fetch                        |
+| `clubs.toml`         | Corpus config: one entry per Wikipedia article to fetch          |
 | `docker-compose.yml` | Postgres 17 + pgvector dev stack                                 |
 | `Makefile`           | Dev interface (`make help`)                                      |
 | `AGENTS.md`          | Contributor/agent instructions (loaded by Claude via `CLAUDE.md`)|

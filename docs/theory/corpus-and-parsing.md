@@ -11,110 +11,161 @@ this chapter as its place.
 
 It is tempting to treat "get the documents" as plumbing and hurry on to embeddings and
 vector search. That instinct is where RAG systems quietly fail. Retrieval can only surface
-what ingestion put in the store, phrased the way it was stored: if a footnote is glued onto
-the end of a paragraph, that noise gets embedded, retrieved, and pasted into the model's
-prompt as if it were law — the generator cannot know it was editorial cruft. **Garbage in,
-garbage out** is the mechanism, not a slogan. Every downstream stage — chunking, embedding,
-retrieval, generation — inherits the quality of this one, and none can recover information
-the corpus never contained. The corpus is the ceiling on how good everything after it can get.
+what ingestion put in the store, phrased the way it was stored: if a citation footnote is
+glued onto the end of a paragraph, that noise gets embedded, retrieved, and pasted into the
+model's prompt as if it were fact — the generator cannot know it was reference cruft.
+**Garbage in, garbage out** is the mechanism, not a slogan. Every downstream stage —
+chunking, embedding, retrieval, generation — inherits the quality of this one, and none can
+recover information the corpus never contained. The corpus is the ceiling on how good
+everything after it can get.
 
-That is why German federal law is a deliberate choice, not a convenient one: it has genuine
-structure (law → Teil/Abschnitt → § → Absatz) that later stages can exploit, so
-structure-aware chunking and citations become a real lesson instead of a pretend exercise
-on a toy corpus.
+Wikipedia articles earn their place here for the same reason: each carries a real heading
+hierarchy — article → `== section ==` → `=== subsection ===` — that later stages can
+exploit, so structure-aware chunking and citations stay a genuine lesson instead of a
+pretend exercise on a flat toy corpus. Be honest about the scale, though: two or three
+heading levels of encyclopedic prose is a **lighter** version of that lesson than a deeply
+nested corpus (reference works such as legal codes or technical manuals) would teach. It is
+real structure, not rich structure — enough to learn why structure beats fixed-size
+splitting, and no more.
 
 ## Licensing and provenance are settled before the first vector
 
 **Licensing.** A RAG system that may not legally reproduce its sources cannot quote or cite
-them — fatal for a system whose answers must point at §§. So rule 3 in
-[AGENTS.md](../../AGENTS.md) admits only public-domain or properly licensed text into the
-corpus. The law texts from gesetze-im-internet.de are amtliche Werke under § 5 UrhG and
-carry no copyright; the live-verified facts — the site's free-reuse statement, the
-statutory basis, and exactly what may enter the corpus — are pinned in the dated
-[corpus licensing decision](../roadmap.md#decisions). This chapter does not restate them;
-it depends on them.
+them — fatal for a system whose answers must point at their sources. Rule 3 in
+[AGENTS.md](../../AGENTS.md) admits only public-domain **or properly licensed** text. English
+Wikipedia clears that bar on the second clause, not the first: its text is **CC BY-SA 4.0**
+(with GFDL dual-listed as a legacy option), **not public domain** (verified live 2026-07-17).
+That is a real licensing step-down — the text is copyrighted and reusable only on conditions,
+where a public-domain source would carry none — and this chapter does not gloss it. Two
+obligations follow, and both are cheap here:
+
+- **Attribution.** Reusing the text requires crediting its authors; a **hyperlink to the
+  article** satisfies this, because the article's history page lists every contributor.
+  Attribution is therefore the same act as provenance (below) — the source URL we record for
+  traceability *is* the credit the licence demands.
+- **Share-alike** binds only **distributed adapted text**, not verbatim copies and not the
+  surrounding code. Storing article text in the **gitignored, runtime-fetched** database is
+  not a distribution event, so no copyleft attaches to this repo. Displaying a retrieved
+  excerpt *is* a reproduction, so it needs attribution and a licence notice — satisfied at
+  the point of display in the generate/ask stage. Whether an LLM paraphrase counts as
+  "adapted material" is legally unsettled; showing the link and licence on every answer
+  neutralizes the question rather than betting on it.
+
+This chapter explains the reasoning; the live-verified facts and exactly what may enter the
+corpus are pinned in the dated [corpus licensing decision](../roadmap.md#decisions), which
+this chapter depends on rather than restates.
 
 **Provenance.** An answer a user cannot trace to a source is an assertion, not a citation —
 and traceability must be built in at ingestion, because no later stage can reconstruct it.
 This is **data lineage**: recording where each indexed piece came from and through which
-transformations. Concretely: fetch records `source_url` and `fetched_at` in each law's
-`fetch.json`; convert copies both into the Markdown front matter (next to the site's own
-`builddate` stamp); Phase 2 carries them into per-chunk metadata, Phase 3 into database
-rows. When Phase 4 answers "according to § 3 AO", that citation is a live pointer to a
-dated download of an official URL — a thread that stays unbroken only because it was tied
-here.
+transformations. Concretely: fetch records the article's `source_title`, `source_url`,
+`fetched_at`, and the exact `page_id` and `revision_id` it read, in each article's
+`fetch.json`; convert copies the slug plus `source_title`, `source_url`, and `fetched_at`
+into the Markdown front matter; Phase 2 carries them into per-chunk metadata, Phase 3 into
+database rows. When the online path answers a question about Arsenal, that citation is a live
+pointer to a dated fetch of a real article URL — a thread that stays unbroken only because it
+was tied here, and which doubles as the CC BY-SA credit.
 
-## Lossless structure-aware parsing beats generic layout extraction
+## Use declared structure, don't infer layout
 
 The generic answer to "turn documents into text" — the one most RAG tutorials reach for,
 because most sources are PDFs — is **document layout analysis (DLA)**: detecting a page's
 visual structure (headings, columns, paragraphs, tables, footnotes) so each region can be
 treated according to its role. DLA is real and sometimes unavoidable, but it is inference
-from visual evidence: it reconstructs, with an error rate, structure the author knew and
-the page format threw away. A heading in an odd font is misread; a two-column layout
-scrambles reading order; a footnote merges into the paragraph above it.
+from visual evidence: it reconstructs, with an error rate, structure the author knew and the
+page format threw away. A heading in an odd font is misread; a two-column layout scrambles
+reading order; a footnote merges into the paragraph above it.
 
-The official law XML (GiI-Norm DTD 1.01) has thrown nothing away — the structure DLA would
-have to guess is declared outright:
+Wikipedia never makes us guess. The MediaWiki Action API's **TextExtracts** extension
+(`prop=extracts&explaintext=1&exsectionformat=wiki`) hands the article over as plain text
+*with the editor-declared section headings kept as `== Heading ==` markers*. The heading tree
+is data the editors wrote, not layout to be recovered from pixels — so convert maps it
+deterministically to Markdown ATX headings: `==` → `##`, `===` → `###`, and so on down to
+H6. That is the anti-DLA lesson intact: use the structure the source declares instead of
+inferring it from a rendered page.
 
-- a **flat list** of `<norm>` elements in document order — reading order is given, not
-  reconstructed;
-- the section hierarchy as `gliederungskennzahl` codes, three digits per level — the
-  Teil/Abschnitt tree is data (the code's length *is* the heading depth), not layout;
-- each norm unit named by its `<enbez>` (`§ 3`, GG's `Art 1`, `Anlage 2`) — the citation
-  anchor, handed over verbatim.
-
-So convert parses the XML directly and maps declared structure deterministically to
-Markdown. One norm maps straight through — `<enbez>` becomes the heading, each `<P>` a
-paragraph that keeps its own `(1)`-style marker:
-
-```xml
-<norm><metadaten><enbez>§ 3</enbez><titel format="XML">Steuern</titel></metadaten>
-  <textdaten><text format="XML"><Content>
-    <P>(1) Steuern sind Geldleistungen …</P></Content></text></textdaten></norm>
-```
-
-```markdown
-## § 3 — Steuern
-
-(1) Steuern sind Geldleistungen …
-```
-
-The transform is **lossless** and **deterministic** (same input files →
-byte-identical output, asserted by golden-file tests per the
-[convert contract](../stages/convert.md)). This is also why Phase 1 uses no
-document-parsing library: reaching for one here would add the very approximation the XML
-lets us avoid — and writing the parser by hand *is* the document-parsing lesson, taken in
-the one case where it can be done exactly.
+Be honest about what that convenience costs. Unlike a parse of the full source markup,
+TextExtracts is **not lossless**: it deliberately strips images, flattens tables and lists to
+plain lines, and drops the reference apparatus. The corpus that reaches chunking is therefore
+**prose only** — accepted and documented, not an accident. We trade fidelity to the whole
+page for text that is clean by construction.
 
 **Text cleaning & normalization** is the counterpart: dropping what should not be kept, so
 only meaningful text reaches chunking. For scraped web pages that means boilerplate and
-cookie banners; here it is the licensing decision made concrete. Footnotes (`<fussnoten>`,
-inline `<FnR>` markers) and editorial apparatus (`<standangabe>` status notes, `<kommentar>`
-Fundstelle references) are the Dokumentationsstelle's editorial additions, not normative
-text, so convert excludes them — a licensing act and a quality act at once, since they are
-exactly the noise that would otherwise be embedded and retrieved as if it were law. The
-only whole norm type skipped is `Inhaltsübersicht`, the XML's own table of contents.
+cookie banners; here it is one more deliberate exclusion. Convert drops the non-prose
+apparatus sections — *References*, *Notes*, *Further reading*, *External links*, *See also*,
+and their kin — matched case-insensitively on the level-2 heading, subsections included.
+These are citation machinery, not article prose; embedding them would put footnote-list noise
+in front of the retriever exactly as glued-on footnotes would. TextExtracts already empties
+most of them; convert removes the rest so the rule is explicit rather than incidental. The
+lead paragraphs — the text before the first heading — become a synthetic `## Introduction`
+section, so they are a chunkable unit like every other section instead of an orphan.
+
+A worked slice — the extract convert reads:
+
+```text
+Arsenal Football Club is a professional football club based in Islington, London, England.
+
+== History ==
+=== Foundation and early years ===
+Arsenal was founded in 1886 in Woolwich …
+```
+
+and the Markdown it emits (front matter abbreviated):
+
+```markdown
+---
+slug: "arsenal"
+source_title: "Arsenal F.C."
+source_url: "https://en.wikipedia.org/wiki/Arsenal_F.C."
+fetched_at: "2026-07-17T12:00:00+00:00"
+---
+
+# Arsenal F.C.
+
+## Introduction
+
+Arsenal Football Club is a professional football club based in Islington, London, England.
+
+## History
+
+### Foundation and early years
+
+Arsenal was founded in 1886 in Woolwich …
+```
+
+The lead becomes `## Introduction`, `== History ==` becomes `## History`, `=== … ===`
+becomes `### …`, and the provenance recorded by fetch rides along in the front matter. The
+transform is **deterministic** — the same extract yields byte-identical Markdown, asserted by
+golden-file tests per the [convert contract](../stages/convert.md). (Fetch, by contrast,
+promises only idempotence, not determinism: Wikipedia is a living corpus, so re-fetching
+legitimately changes the text.) This is also why Phase 1 uses no document-parsing library:
+the API already hands over declared structure, so reaching for a layout model here would
+reintroduce the very approximation we are avoiding.
 
 ## No silent content loss: fail loud
 
-Lossless only means something if the parser is honest about what it cannot handle. The
-tolerant alternative — skip the unfamiliar element, emit plausible-looking Markdown — is
-how corpora rot invisibly: the output is quietly missing a table or a subsection, and no
-downstream stage can notice text that simply isn't there. That is garbage in, garbage out
-created by the tool itself.
+The faithfulness claim is weaker than a full-markup parse could make — convert is faithful to
+the *prose the API returns*, not to the whole page. Within that scope, though, it still
+refuses best effort. The tolerant alternative — skip the unfamiliar construct, emit
+plausible-looking Markdown — is how corpora rot invisibly: the output is quietly missing a
+subsection, and no downstream stage can notice text that simply isn't there. That is garbage
+in, garbage out created by the tool itself.
 
-Convert therefore refuses best effort: any construct it cannot render faithfully — an
-unknown element, stray text where none is allowed, a missing `builddate`, a heading nested
-past H6 — raises `ConversionError`, and the failed law's output file is not written
-([code](../../src/rag/convert/__init__.py), [contract](../stages/convert.md)). The parser
-is only allowed to claim losslessness because it is not allowed to fail quietly.
+Convert therefore fails loud: malformed provenance in `fetch.json`, a missing extract file,
+an extract with no renderable content, or a heading nested past H6 each raise
+`ConversionError`, and the failed article's Markdown file is not written
+([code](../../src/rag/convert/__init__.py), [contract](../stages/convert.md)). Fetch guards
+its own end: an article whose extract comes back empty fails the stage rather than entering
+the corpus as a blank. The pipeline is only allowed to claim faithfulness because it is not
+allowed to fail quietly.
 
 ## Where generic document parsing enters later
 
-None of this makes DLA wrong — it is the wrong tool when the source already carries its
-structure. Messy PDFs, scanned pages, and tables that exist only as visual grids are real,
-and they enter this repo deliberately as Backlog 12 (the Docling ingestion path in the
-[roadmap](../roadmap.md)), a second connector proving the same stage interfaces against a
-genuinely unstructured source. This chapter is the contrast that motivates it: here the
-structure was declared and we used it; there it must be inferred — and measured.
+None of this makes DLA wrong — it is the wrong tool when the source already hands over its
+structure, as the API does here. Messy PDFs, scanned pages, and tables that exist only as
+visual grids are real, and they enter this repo deliberately as Backlog 12 (the Docling
+ingestion path in the [roadmap](../roadmap.md)), a second connector proving the same stage
+interfaces against a genuinely unstructured source. This chapter is the contrast that
+motivates it: here the structure was declared and we used it; there it must be inferred — and
+measured.

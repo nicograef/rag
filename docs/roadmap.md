@@ -166,8 +166,8 @@ prunes superseded decisions, not the verify-before-claiming discipline).
 | Decision            | Choice                                                        |
 | ------------------- | ------------------------------------------------------------- |
 | Python tooling      | uv (venv, lockfile, `uv run`)                                 |
-| Corpus acquisition  | Official gesetze-im-internet.de XML → Markdown via Python     |
-| MVP corpus          | AO, UStG, KassenSichV, GG                                     |
+| Corpus acquisition  | English Wikipedia article extracts (MediaWiki Action API) → Markdown via Python |
+| MVP corpus          | The 20 current Premier League clubs' English Wikipedia articles |
 | Docs language       | English (German only for corpus + domain terms)               |
 | LLM runtime (PoC)   | Ollama                                                        |
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
@@ -399,33 +399,31 @@ online path.
   until the evaluation harness (Backlog 1); the README quick start states the 2.5 GB
   model download and the image pull.
 
-**Corpus licensing — gesetze-im-internet.de** (verified live 2026-07-12): only the
-normative law texts enter the corpus; footnotes and editorial apparatus stay out.
+**Corpus licensing — English Wikipedia** (verified live 2026-07-17): the article text is
+CC BY-SA 4.0, properly licensed for the playbook's gitignored, runtime-fetched use.
 
-- **Context:** Phase 1's fetch stage ingests XML from gesetze-im-internet.de, and rule 3
-  in [AGENTS.md](../AGENTS.md) demands that only public-domain or properly licensed
-  sources enter the corpus. The licensing facts had so far been asserted from memory and
-  a mirror; this entry pins them from the live site.
-- **Facts (all verified live 2026-07-12):** the site's start page states: „Die
-  Rechtsnormen in deutscher Sprache stehen in allen angebotenen Formaten zur freien
-  Nutzung und Weiterverwendung zur Verfügung." (<https://www.gesetze-im-internet.de/> —
-  note the wording differs slightly from the often-cited „in ihrer deutschsprachigen
-  Fassung" variant). The statutory basis is § 5 Abs. 1 UrhG: „Gesetze, Verordnungen,
-  amtliche Erlasse und Bekanntmachungen sowie Entscheidungen und amtlich verfaßte
-  Leitsätze zu Entscheidungen genießen keinen urheberrechtlichen Schutz."
-  (<https://www.gesetze-im-internet.de/urhg/__5.html>). The Hinweise page (section 6,
-  „Download und Weiterverwertung der Normen") documents the XML offering and its DTD
-  (`/dtd/1.01/gii-norm.dtd`) and adds no further licence terms. The download URLs of all
-  four MVP laws respond and contain the expected GiI-Norm XML (`make fetch` run live the
-  same day).
-- **Choice:** the corpus may include the **normative texts** — norm headings and body
-  text of the German-language laws. **Footnotes (`<fussnoten>`) and editorial apparatus
-  (`<standangabe>`, status notes) are excluded**: they are editorial additions of the
-  Dokumentationsstelle, covered neither clearly by § 5 Abs. 1 UrhG („Gesetze,
-  Verordnungen …") nor unambiguously by the free-reuse statement („Die Rechtsnormen …"),
-  so the conservative reading wins.
-- **Consequences:** convert emits normative text only; the README's licensing wording
-  (amtliche Werke, § 5 UrhG, public domain) is confirmed unchanged; the
-  [fetch contract](stages/fetch.md) links here as its licensing basis. If a future
-  source's terms are less clear, it does not enter the corpus (rule: never ingest
-  sources with unclear licensing).
+- **Context:** the fetch stage ingests article extracts from the English Wikipedia
+  MediaWiki Action API, and rule 3 in [AGENTS.md](../AGENTS.md) demands that only
+  public-domain or properly licensed sources enter the corpus. Wikipedia text is a genuine
+  step down from the amtliche-Werke cleanliness of the former law corpus, so its terms are
+  pinned here from primary sources rather than asserted.
+- **Facts (all verified live 2026-07-17):** English Wikipedia prose is licensed
+  **CC BY-SA 4.0** (Wikipedia:Copyrights + the Wikimedia Terms of Use; the GFDL is
+  dual-listed as a legacy licence), **not public domain**. Attribution is satisfied by a
+  **hyperlink to the article** — its history page lists every author. Share-alike (copyleft)
+  binds only **distributed adapted text**: not verbatim copies, and not the surrounding code.
+- **Choice:** the corpus is **CC BY-SA 4.0, used under attribution**. Because `data/` is
+  gitignored and the corpus is **fetched at runtime, never redistributed in git**, storing
+  the text in the local database is **not a distribution event** — no copyleft attaches to
+  the repo. Displaying a retrieved excerpt *is* a reproduction, so the online path shows the
+  **article link and a CC BY-SA licence notice at the point of display** (the assemble/ask
+  stage). This qualifies as "properly licensed" under rule 3; the § 5 UrhG public-domain
+  basis of the former law corpus no longer applies.
+- **Consequences:** convert emits **prose only** — TextExtracts already strips images,
+  flattens tables and lists, and drops the reference apparatus, and convert drops the
+  remaining non-prose apparatus sections (References, External links, See also, …); the
+  online path carries the attribution obligation to the point of display; the
+  [fetch contract](stages/fetch.md) links here as its licensing basis. Whether an LLM
+  *paraphrase* is "adapted material" is legally unsettled; the attribution posture
+  neutralizes it. If a future source's terms are less clear, it does not enter the corpus
+  (rule: never ingest sources with unclear licensing).

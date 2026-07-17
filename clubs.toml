@@ -1,0 +1,33 @@
+# Wikipedia articles in the corpus, keyed by a short, filesystem-safe slug.
+# The fetch stage requests each article's plain-text extract from the English
+# Wikipedia MediaWiki Action API; the value is the exact article title used as the
+# API `titles=` value. The slug is the stable key for data/raw/<slug>/,
+# data/corpus/<slug>.md, and the DB `slug` column. Adding an article to the corpus
+# means adding one line here (this is the corpus knob; point CORPUS_CONFIG elsewhere
+# to swap the whole list).
+#
+# The 20 current Premier League clubs (2025–26 season; titles verified against the
+# live Action API on 2026-07-17 — all resolve directly, no redirects). Promotion and
+# relegation change roughly three lines each season.
+
+[clubs]
+arsenal = "Arsenal F.C."
+aston-villa = "Aston Villa F.C."
+bournemouth = "AFC Bournemouth"
+brentford = "Brentford F.C."
+brighton = "Brighton & Hove Albion F.C."
+burnley = "Burnley F.C."
+chelsea = "Chelsea F.C."
+crystal-palace = "Crystal Palace F.C."
+everton = "Everton F.C."
+fulham = "Fulham F.C."
+leeds = "Leeds United F.C."
+liverpool = "Liverpool F.C."
+manchester-city = "Manchester City F.C."
+manchester-united = "Manchester United F.C."
+newcastle = "Newcastle United F.C."
+nottingham-forest = "Nottingham Forest F.C."
+sunderland = "Sunderland A.F.C."
+tottenham = "Tottenham Hotspur F.C."
+west-ham = "West Ham United F.C."
+wolves = "Wolverhampton Wanderers F.C."

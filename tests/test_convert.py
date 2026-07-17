@@ -1,316 +1,168 @@
-"""Contract tests for the convert stage — golden-file driven, no network."""
+"""Contract tests for the convert stage — golden-file driven, no network.
+
+convert turns a fetched Wikipedia extract into section-structured Markdown. The golden files
+under ``tests/fixtures/corpus/`` are committed artifacts (regenerate them deliberately, never
+on the fly) pinned against the truncated-article extract fixtures under ``tests/fixtures/raw/``.
+"""
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
 
-from rag.chunk import chunk_corpus
-from rag.convert import ConversionError, convert_law, load_provenance, main
+from rag.chunk import parse_front_matter
+from rag.convert import (
+    ConversionError,
+    Provenance,
+    convert_article,
+    load_provenance,
+    main,
+    render_markdown,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
-FIXTURE_LAW = FIXTURES / "raw" / "kassensichv"
-GOLDEN = FIXTURES / "corpus" / "kassensichv.md"
+ARTICLES = ["brentford", "fulham"]
 
-LAWS = ["kassensichv", "strukturg", "artg", "tabelleng"]
+PROV = Provenance(
+    slug="x",
+    source_title="X F.C.",
+    source_url="https://en.wikipedia.org/wiki/X",
+    fetched_at="2026-07-17T00:00:00+00:00",
+)
 
 
-@pytest.mark.parametrize("slug", LAWS)
-def test_convert_law_matches_golden_file(slug: str, tmp_path: Path) -> None:
-    output = convert_law(FIXTURES / "raw" / slug, tmp_path)
+@pytest.mark.parametrize("slug", ARTICLES)
+def test_convert_article_matches_golden_file(slug: str, tmp_path: Path) -> None:
+    output = convert_article(FIXTURES / "raw" / slug, tmp_path)
 
     assert output == tmp_path / f"{slug}.md"
     assert output.read_bytes() == (FIXTURES / "corpus" / f"{slug}.md").read_bytes()
 
 
-@pytest.mark.parametrize("slug", LAWS)
+@pytest.mark.parametrize("slug", ARTICLES)
 def test_convert_is_deterministic(slug: str, tmp_path: Path) -> None:
-    law_dir = FIXTURES / "raw" / slug
-    first = convert_law(law_dir, tmp_path / "one").read_bytes()
-    second = convert_law(law_dir, tmp_path / "two").read_bytes()
+    article_dir = FIXTURES / "raw" / slug
+    first = convert_article(article_dir, tmp_path / "one").read_bytes()
+    second = convert_article(article_dir, tmp_path / "two").read_bytes()
 
     assert first == second
 
 
-def law_dir_with_xml(tmp_path: Path, xml: str) -> Path:
-    """A minimal law directory: one XML file plus a matching fetch.json."""
-    law_dir = tmp_path / "somelaw"
-    law_dir.mkdir(parents=True)
-    (law_dir / "law.xml").write_text(xml, encoding="utf-8")
-    (law_dir / "fetch.json").write_text(
-        '{"slug": "somelaw", "source_url": "https://example.org/somelaw/xml.zip",'
-        ' "fetched_at": "2026-07-12T00:00:00+00:00", "files": ["law.xml"]}',
-        encoding="utf-8",
+def test_lead_paragraphs_become_an_introduction_section() -> None:
+    md = render_markdown("Lead one.\nLead two.\n\n== History ==\nText.", PROV)
+
+    assert "# X F.C." in md
+    assert "## Introduction\n\nLead one.\n\nLead two." in md
+
+
+def test_wiki_headings_translate_to_atx_by_level() -> None:
+    md = render_markdown("Lead.\n\n== History ==\n\n=== Early ===\nText.", PROV)
+    body = md.split("---", 2)[2]
+
+    assert "## History" in md
+    assert "### Early" in md
+    assert "==" not in body  # no wiki heading markers survive
+
+
+def test_excluded_apparatus_sections_are_dropped() -> None:
+    extract = (
+        "Lead.\n\n== Career ==\nProse.\n\n== See also ==\nLink\n\n"
+        "== References ==\n\n== External links ==\nSite"
     )
-    return law_dir
+    md = render_markdown(extract, PROV)
+
+    assert "## Career\n\nProse." in md
+    for dropped in ("See also", "References", "External links", "Link", "Site"):
+        assert dropped not in md
 
 
-HEADER_NORM = (
-    "<norm><metadaten><jurabk>SomeLaw</jurabk><langue>Ein Gesetz</langue></metadaten></norm>"
-)
+def test_an_excluded_section_drops_its_subsections_but_a_later_section_resumes() -> None:
+    extract = "Lead.\n\n== References ==\n=== Works cited ===\nA book.\n\n== Honours ==\nA cup."
+    md = render_markdown(extract, PROV)
+
+    assert "Works cited" not in md and "A book." not in md
+    assert "## Honours\n\nA cup." in md
 
 
-@pytest.mark.parametrize(
-    "norm",
-    [
-        # Unknown inline element in a paragraph — must not be silently dropped.
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text>"
-        "<Content><P>Bild <IMG SRC='x.png'/> hier.</P></Content></text></textdaten></norm>",
-        # A block-level element in a table cell is beyond the cell-flattening model.
-        "<norm><metadaten><enbez>Anlage 1</enbez></metadaten><textdaten><text><Content><P>"
-        "<table><tgroup cols='1'><tbody><row><entry><P>Absatz</P></entry></row>"
-        "</tbody></tgroup></table></P></Content></text></textdaten></norm>",
-        # A gliederungskennzahl of length 18 would push its units past H6.
-        "<norm><metadaten><gliederungseinheit>"
-        "<gliederungskennzahl>010010010010010010</gliederungskennzahl>"
-        "<gliederungsbez>Tief</gliederungsbez></gliederungseinheit></metadaten></norm>",
-        # A section norm must render to an empty body; stray text is content loss.
-        "<norm><metadaten><gliederungseinheit><gliederungskennzahl>010</gliederungskennzahl>"
-        "<gliederungsbez>Teil</gliederungsbez></gliederungseinheit></metadaten><textdaten><text>"
-        "<Content><P>Text im Abschnitt</P></Content></text></textdaten></norm>",
-        # A thead with two rows is outside the single-header-row table model.
-        "<norm><metadaten><enbez>Anlage 1</enbez></metadaten><textdaten><text><Content><P>"
-        "<table><tgroup cols='1'><thead><row><entry>A</entry></row>"
-        "<row><entry>B</entry></row></thead><tbody><row><entry>C</entry></row></tbody>"
-        "</tgroup></table></P></Content></text></textdaten></norm>",
-        # A DD holding something other than <LA> — the item shape is unsupported.
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content><P>"
-        "Liste: <DL><DT>1.</DT><DD><P>Absatz statt LA</P></DD></DL></P></Content>"
-        "</text></textdaten></norm>",
-        # A gliederungskennzahl whose length is not a multiple of three is malformed.
-        "<norm><metadaten><gliederungseinheit><gliederungskennzahl>0100</gliederungskennzahl>"
-        "<gliederungsbez>Teil</gliederungsbez></gliederungseinheit></metadaten></norm>",
-    ],
-)
-def test_unsupported_structure_fails_loudly_instead_of_losing_content(
-    tmp_path: Path, norm: str
-) -> None:
-    xml = f"<dokumente builddate='20260101000000'>{HEADER_NORM}{norm}</dokumente>"
-    law_dir = law_dir_with_xml(tmp_path, xml)
+def test_front_matter_escaping_round_trips_to_the_chunk_reader() -> None:
+    # A title carrying both a `"` and a `\` must survive convert's front-matter escaping and
+    # the chunk stage's front-matter reader byte-for-byte.
+    prov = Provenance(slug="x", source_title='A"B\\C', source_url="u", fetched_at="t")
+    md = render_markdown("Lead.\n\n== H ==\nText.", prov)
 
-    with pytest.raises(ConversionError):
-        convert_law(law_dir, tmp_path / "corpus")
-    assert not (tmp_path / "corpus" / "somelaw.md").exists()  # nothing written on failure
+    fields, _ = parse_front_matter(md.rstrip("\n").split("\n"))
+
+    assert fields["source_title"] == 'A"B\\C'
 
 
-def test_non_xml_files_are_ignored_and_flagged(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    law_dir = tmp_path / "kassensichv"
-    shutil.copytree(FIXTURE_LAW, law_dir)
-    (law_dir / "attachment.gif").write_bytes(b"GIF89a")
-    fetch_json = (law_dir / "fetch.json").read_text(encoding="utf-8")
-    (law_dir / "fetch.json").write_text(
-        fetch_json.replace('"BJNR351500017.xml"', '"BJNR351500017.xml",\n    "attachment.gif"'),
-        encoding="utf-8",
+def test_an_extract_with_no_content_is_an_error() -> None:
+    with pytest.raises(ConversionError, match="no renderable content"):
+        render_markdown("   \n\n  ", PROV)
+
+
+def test_a_heading_deeper_than_h6_is_an_error() -> None:
+    with pytest.raises(ConversionError, match="exceeds H6"):
+        render_markdown("Lead.\n\n======= Too deep =======\nText.", PROV)
+
+
+def test_malformed_fetch_json_is_an_error(tmp_path: Path) -> None:
+    article_dir = tmp_path / "x"
+    article_dir.mkdir()
+    (article_dir / "fetch.json").write_text("{ not json", encoding="utf-8")
+
+    with pytest.raises(ConversionError, match="invalid"):
+        load_provenance(article_dir)
+
+
+def test_fetch_json_missing_a_field_is_an_error(tmp_path: Path) -> None:
+    article_dir = tmp_path / "x"
+    article_dir.mkdir()
+    (article_dir / "fetch.json").write_text('{"slug": "x"}', encoding="utf-8")
+
+    with pytest.raises(ConversionError, match="invalid"):
+        load_provenance(article_dir)
+
+
+def _valid_fetch_json(slug: str) -> str:
+    return json.dumps(
+        {"slug": slug, "source_title": slug.title(), "source_url": "u", "fetched_at": "t"}
     )
 
-    output = convert_law(law_dir, tmp_path / "corpus")
 
-    assert output.read_bytes() == GOLDEN.read_bytes()
-    assert "ignoring non-XML file: attachment.gif" in capsys.readouterr().out
+def test_a_missing_extract_file_is_an_error(tmp_path: Path) -> None:
+    article_dir = tmp_path / "x"
+    article_dir.mkdir()
+    (article_dir / "fetch.json").write_text(_valid_fetch_json("x"), encoding="utf-8")
 
-
-def test_a_non_object_fetch_json_is_an_error(tmp_path: Path) -> None:
-    law_dir = tmp_path / "somelaw"
-    law_dir.mkdir()
-    (law_dir / "fetch.json").write_text("[]", encoding="utf-8")
-
-    with pytest.raises(ConversionError, match=r"invalid .*fetch\.json"):
-        load_provenance(law_dir)
+    with pytest.raises(ConversionError, match="missing"):
+        convert_article(article_dir, tmp_path / "corpus")
 
 
-def test_main_converts_all_laws_and_a_failing_law_stops_no_others(
+def test_main_without_raw_dir_fails_with_a_hint(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    raw_dir = tmp_path / "raw"
-    shutil.copytree(FIXTURE_LAW, raw_dir / "kassensichv")
-    broken = law_dir_with_xml(raw_dir, "<dokumente>not well-formed")
-    corpus_dir = tmp_path / "corpus"
-
-    exit_code = main(["--raw-dir", str(raw_dir), "--corpus-dir", str(corpus_dir)])
-
-    assert exit_code == 1
-    assert (corpus_dir / "kassensichv.md").exists()
-    assert not (corpus_dir / "somelaw.md").exists()
-    assert broken.name in capsys.readouterr().err
-
-
-def test_main_without_fetched_laws_fails_with_a_hint(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    exit_code = main(["--raw-dir", str(tmp_path / "missing"), "--corpus-dir", str(tmp_path)])
+    exit_code = main(["--raw-dir", str(tmp_path / "nope"), "--corpus-dir", str(tmp_path)])
 
     assert exit_code == 1
     assert "make fetch" in capsys.readouterr().err
 
 
-# ── Escaping and positive-path render oracles (minimal inline XML, exact output) ──
+def test_main_isolates_a_failing_article_from_the_others(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    raw = tmp_path / "raw"
+    (raw / "good").mkdir(parents=True)
+    (raw / "bad").mkdir()
+    (raw / "good" / "fetch.json").write_text(_valid_fetch_json("good"), encoding="utf-8")
+    (raw / "good" / "extract.txt").write_text("Lead.\n\n== H ==\nText.", encoding="utf-8")
+    (raw / "bad" / "fetch.json").write_text(
+        _valid_fetch_json("bad"), encoding="utf-8"
+    )  # no extract
+    corpus = tmp_path / "corpus"
 
+    exit_code = main(["--raw-dir", str(raw), "--corpus-dir", str(corpus)])
 
-def rendered_body(tmp_path: Path, norm: str) -> str:
-    """The Markdown a one-body-norm document renders after the `# Ein Gesetz` H1 (test helper)."""
-    xml = f"<dokumente builddate='20260101000000'>{HEADER_NORM}{norm}</dokumente>"
-    output = convert_law(law_dir_with_xml(tmp_path, xml), tmp_path / "corpus")
-    return output.read_text(encoding="utf-8").split("# Ein Gesetz\n\n", 1)[1]
-
-
-def test_a_table_cell_pipe_is_escaped(tmp_path: Path) -> None:
-    # A literal `|` in cell text must be escaped so it cannot be read as a column boundary.
-    norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content><P>"
-        '<table><tgroup cols="1"><tbody>'
-        "<row><entry>links|rechts</entry></row>"
-        "</tbody></tgroup></table></P></Content></text></textdaten></norm>"
-    )
-
-    assert r"| links\|rechts |" in rendered_body(tmp_path, norm)
-
-
-def test_a_regular_cals_table_renders_a_pipe_table(tmp_path: Path) -> None:
-    norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content><P>"
-        '<table><tgroup cols="2">'
-        "<thead><row><entry>Spalte A</entry><entry>Spalte B</entry></row></thead>"
-        "<tbody><row><entry>1</entry><entry>2</entry></row></tbody>"
-        "</tgroup></table></P></Content></text></textdaten></norm>"
-    )
-
-    assert rendered_body(tmp_path, norm) == (
-        "## § 1\n\n| Spalte A | Spalte B |\n| --- | --- |\n| 1 | 2 |\n"
-    )
-
-
-def test_an_irregular_cals_table_renders_a_fenced_block(tmp_path: Path) -> None:
-    # A `morerows` span makes the table irregular, so it falls back to a fenced ``table`` block.
-    norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content><P>"
-        '<table><tgroup cols="2"><tbody>'
-        '<row><entry morerows="1">Merge</entry><entry>Eins</entry></row>'
-        "<row><entry>Zwei</entry></row>"
-        "</tbody></tgroup></table></P></Content></text></textdaten></norm>"
-    )
-
-    assert rendered_body(tmp_path, norm) == "## § 1\n\n```table\nMerge | Eins\nZwei\n```\n"
-
-
-def test_a_nested_dl_indents_the_inner_list(tmp_path: Path) -> None:
-    # A nested <DL> is indented 4 spaces per level; under the marked item `1.` the inner `a)`
-    # lands at 8 spaces (4 for the nesting, 4 more as a continuation line of item `1.`).
-    norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content>"
-        "<P>Aufzählung:<DL><DT>1.</DT><DD><LA>Oberpunkt"
-        "<DL><DT>a)</DT><DD><LA>Unterpunkt</LA></DD></DL>"
-        "</LA></DD></DL></P></Content></text></textdaten></norm>"
-    )
-
-    assert rendered_body(tmp_path, norm) == (
-        "## § 1\n\nAufzählung:\n\n1. Oberpunkt\n        a) Unterpunkt\n"
-    )
-
-
-def test_a_bold_run_renders_markdown_bold(tmp_path: Path) -> None:
-    norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content>"
-        "<P>Ein Satz mit <B>fettem</B> Wort.</P></Content></text></textdaten></norm>"
-    )
-
-    assert rendered_body(tmp_path, norm) == "## § 1\n\nEin Satz mit **fettem** Wort.\n"
-
-
-def test_abbreviation_escaping_round_trips_through_convert_and_chunk(tmp_path: Path) -> None:
-    # An <amtabk> carrying both a `"` and a `\` must survive convert's front-matter escaping
-    # and chunk's unescape byte-for-byte, so the chunk's `source_title` equals the source value.
-    abbreviation = 'A"B\\C'
-    header = (
-        f"<norm><metadaten><amtabk>{abbreviation}</amtabk>"
-        "<langue>Ein Gesetz</langue></metadaten></norm>"
-    )
-    body_norm = (
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten><textdaten><text><Content>"
-        "<P>Inhalt.</P></Content></text></textdaten></norm>"
-    )
-    xml = f"<dokumente builddate='20260101000000'>{header}{body_norm}</dokumente>"
-    markdown = convert_law(law_dir_with_xml(tmp_path, xml), tmp_path / "corpus").read_text(
-        encoding="utf-8"
-    )
-
-    (chunk,) = chunk_corpus(markdown)
-
-    assert chunk.source_title == abbreviation
-
-
-# ── Guard tests: inputs the converter cannot render faithfully fail loudly ──
-
-
-def law_dir_with_files(tmp_path: Path, files: list[str]) -> Path:
-    """A law directory whose fetch.json lists exactly `files` (no XML written to disk)."""
-    law_dir = tmp_path / "somelaw"
-    law_dir.mkdir(parents=True)
-    (law_dir / "fetch.json").write_text(
-        json.dumps(
-            {
-                "slug": "somelaw",
-                "source_url": "https://example.org/somelaw/xml.zip",
-                "fetched_at": "2026-07-12T00:00:00+00:00",
-                "files": files,
-            }
-        ),
-        encoding="utf-8",
-    )
-    return law_dir
-
-
-def test_zero_xml_files_is_an_error(tmp_path: Path) -> None:
-    with pytest.raises(ConversionError, match="expected exactly one XML file"):
-        convert_law(law_dir_with_files(tmp_path, []), tmp_path / "corpus")
-
-
-def test_two_xml_files_is_an_error(tmp_path: Path) -> None:
-    with pytest.raises(ConversionError, match="expected exactly one XML file"):
-        convert_law(law_dir_with_files(tmp_path, ["a.xml", "b.xml"]), tmp_path / "corpus")
-
-
-def test_a_document_without_norms_is_an_error(tmp_path: Path) -> None:
-    law_dir = law_dir_with_xml(tmp_path, "<dokumente builddate='20260101000000'></dokumente>")
-
-    with pytest.raises(ConversionError, match="no <norm> elements"):
-        convert_law(law_dir, tmp_path / "corpus")
-
-
-def test_a_missing_builddate_is_an_error(tmp_path: Path) -> None:
-    law_dir = law_dir_with_xml(tmp_path, f"<dokumente>{HEADER_NORM}</dokumente>")
-
-    with pytest.raises(ConversionError, match="missing builddate"):
-        convert_law(law_dir, tmp_path / "corpus")
-
-
-def test_a_first_norm_with_an_enbez_is_an_error(tmp_path: Path) -> None:
-    xml = (
-        "<dokumente builddate='20260101000000'>"
-        "<norm><metadaten><enbez>§ 1</enbez></metadaten></norm></dokumente>"
-    )
-
-    with pytest.raises(ConversionError, match="is not the law's header norm"):
-        convert_law(law_dir_with_xml(tmp_path, xml), tmp_path / "corpus")
-
-
-def test_a_header_norm_without_langue_is_an_error(tmp_path: Path) -> None:
-    xml = (
-        "<dokumente builddate='20260101000000'>"
-        "<norm><metadaten><jurabk>SomeLaw</jurabk></metadaten></norm></dokumente>"
-    )
-
-    with pytest.raises(ConversionError, match="no <langue>"):
-        convert_law(law_dir_with_xml(tmp_path, xml), tmp_path / "corpus")
-
-
-def test_a_header_norm_without_an_abbreviation_is_an_error(tmp_path: Path) -> None:
-    xml = (
-        "<dokumente builddate='20260101000000'>"
-        "<norm><metadaten><langue>Ein Gesetz</langue></metadaten></norm></dokumente>"
-    )
-
-    with pytest.raises(ConversionError, match="neither <amtabk> nor <jurabk>"):
-        convert_law(law_dir_with_xml(tmp_path, xml), tmp_path / "corpus")
+    assert exit_code == 1
+    assert (corpus / "good.md").exists()  # the healthy article still converted
+    assert not (corpus / "bad.md").exists()  # the failing article wrote nothing
+    assert "bad" in capsys.readouterr().err
