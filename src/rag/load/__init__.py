@@ -81,11 +81,14 @@ def read_records(jsonl_file: Path) -> list[dict]:
     records = []
     for number, line in enumerate(jsonl_file.read_text(encoding="utf-8").splitlines(), start=1):
         try:
-            records.append(json.loads(line))
+            record = json.loads(line)
         except json.JSONDecodeError as error:
             raise LoadError(
                 f"{jsonl_file.name}: invalid record on line {number}: {error}"
             ) from error
+        if not isinstance(record, dict):
+            raise LoadError(f"{jsonl_file.name}: invalid record on line {number}: not an object")
+        records.append(record)
     return records
 
 
@@ -96,15 +99,18 @@ def join_law(chunk_records: list[dict], embedding_records: list[dict], dim: int)
     vector has no chunk, the embedding records disagree on one model and dimension, or that
     dimension does not match the ``dim`` the schema's vector column is fixed to.
     """
-    models = {record["model"] for record in embedding_records}
-    dims = {record["dim"] for record in embedding_records}
+    try:
+        models = {record["model"] for record in embedding_records}
+        dims = {record["dim"] for record in embedding_records}
+        vectors = {record["id"]: record["embedding"] for record in embedding_records}
+        chunk_ids = [record["id"] for record in chunk_records]
+    except KeyError as error:
+        raise LoadError(f"record missing field {error}") from error
+
     if len(models) > 1 or len(dims) > 1:
         raise LoadError(f"embedding records disagree on model/dim: {models}/{dims}")
     if dims and dims != {dim}:
         raise LoadError(f"embedding dim {dims.pop()} does not match the schema's vector({dim})")
-
-    vectors = {record["id"]: record["embedding"] for record in embedding_records}
-    chunk_ids = [record["id"] for record in chunk_records]
     if missing := [chunk_id for chunk_id in chunk_ids if chunk_id not in vectors]:
         raise LoadError(f"chunk(s) without an embedding: {', '.join(missing)}")
     if orphans := sorted(set(vectors) - set(chunk_ids)):

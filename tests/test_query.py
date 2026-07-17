@@ -46,6 +46,15 @@ def test_main_without_connection_settings_fails_with_a_hint(
     assert ".env.example" in capsys.readouterr().err
 
 
+def test_a_non_positive_top_k_is_rejected_at_parsing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit):
+        main(["Wie funktioniert das?", "--top-k", "0"], embedder=FakeEmbedder())
+
+    assert "--top-k must be at least 1" in capsys.readouterr().err
+
+
 @pytest.mark.integration
 def test_query_prints_ranked_hits_from_the_store(
     test_db: psycopg.Connection, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -76,11 +76,27 @@ def test_a_chunk_record_missing_a_field_is_an_error() -> None:
         join_law(chunks, embeddings, dim=8)
 
 
+def test_an_embedding_record_missing_a_field_is_an_error() -> None:
+    chunks, embeddings = _fixture_records()
+    del embeddings[0]["model"]
+
+    with pytest.raises(LoadError, match="missing field 'model'"):
+        join_law(chunks, embeddings, dim=8)
+
+
 def test_read_records_reports_the_broken_line(tmp_path: Path) -> None:
     jsonl = tmp_path / "broken.jsonl"
     jsonl.write_text('{"id": "ok"}\nnot json\n', encoding="utf-8")
 
     with pytest.raises(LoadError, match="line 2"):
+        read_records(jsonl)
+
+
+def test_read_records_rejects_a_non_object_line(tmp_path: Path) -> None:
+    jsonl = tmp_path / "broken.jsonl"
+    jsonl.write_text('{"id": "ok"}\n[1, 2]\n', encoding="utf-8")
+
+    with pytest.raises(LoadError, match="line 2: not an object"):
         read_records(jsonl)
 
 

@@ -56,6 +56,8 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
     parser.add_argument("question", help="the question to search for")
     parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K, help="number of hits to print")
     args = parser.parse_args(argv)
+    if args.top_k < 1:
+        parser.error("--top-k must be at least 1")
 
     try:
         conninfo = connection_conninfo()

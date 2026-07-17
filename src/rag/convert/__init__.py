@@ -60,7 +60,7 @@ def load_provenance(law_dir: Path) -> Provenance:
             fetched_at=record["fetched_at"],
             files=record["files"],
         )
-    except (json.JSONDecodeError, KeyError) as error:
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
         raise ConversionError(f"invalid {fetch_json}: {error!r}") from error
 
 

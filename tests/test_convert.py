@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rag.convert import ConversionError, convert_law, main
+from rag.convert import ConversionError, convert_law, load_provenance, main
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_LAW = FIXTURES / "raw" / "kassensichv"
@@ -108,6 +108,15 @@ def test_non_xml_files_are_ignored_and_flagged(
 
     assert output.read_bytes() == GOLDEN.read_bytes()
     assert "ignoring non-XML file: attachment.gif" in capsys.readouterr().out
+
+
+def test_a_non_object_fetch_json_is_an_error(tmp_path: Path) -> None:
+    law_dir = tmp_path / "somelaw"
+    law_dir.mkdir()
+    (law_dir / "fetch.json").write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ConversionError, match=r"invalid .*fetch\.json"):
+        load_provenance(law_dir)
 
 
 def test_main_converts_all_laws_and_a_failing_law_stops_no_others(
