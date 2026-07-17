@@ -1,0 +1,38 @@
+---
+slug: "citypark"
+source_title: "City Park F.C."
+source_url: "https://en.wikipedia.org/wiki/City_Park_F.C."
+fetched_at: "2026-07-17T12:00:00+00:00"
+---
+
+# City Park F.C.
+
+## Introduction
+
+City Park Football Club is a fictional professional football club used only as a chunking test fixture. It competes in an imaginary league and its entire history is invented to exercise the section splitter with predictable, oversized structure.
+
+## History
+
+### Foundation
+
+City Park was founded in 1901 by a group of railway workers who wanted a club of their own. The founders drew up the first rules in a station waiting room and played their earliest matches on a field beside the goods yard, borrowing kit from a local cricket team for the first two seasons of competitive play.
+
+### Rise
+
+Through the 1920s City Park climbed steadily, winning promotion three times in a single decade. The club's first silverware arrived in 1927, a regional cup lifted after a replay, and average attendances doubled as the town grew around the ground and the tramway reached the terraces.
+
+### Decline
+
+The post-war years were unkind to City Park, whose ageing ground and thin finances forced the sale of its best players season after season. Two relegations in four years dropped the club into the lowest tier, where it languished while rivals modernised and overtook it on and off the pitch.
+
+### Revival
+
+A new ownership group arrived in 2005 and rebuilt the club from its foundations, clearing debts, refurbishing the ground, and appointing a young manager who favoured attacking football. Promotion followed in 2011, and City Park has since established itself as a competitive side once again.
+
+## Ground
+
+City Park have played at Station Road since 1904, a compact ground on the site of the original goods-yard field, redeveloped in stages but never relocated.
+
+## Nickname
+
+City Park are nicknamed "The Railwaymen", a nod to the founders who worked on the town's railway.

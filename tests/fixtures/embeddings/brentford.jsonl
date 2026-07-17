@@ -1,0 +1,2 @@
+{"id": "brentford#Introduction", "model": "fake-embedder", "dim": 8, "embedding": [0.435294, 0.92549, 0.160784, 0.07451, 0.062745, 0.411765, 0.25098, 0.678431]}
+{"id": "brentford#History", "model": "fake-embedder", "dim": 8, "embedding": [0.52549, 0.498039, 0.298039, 0.556863, 0.023529, 0.521569, 0.960784, 0.780392]}

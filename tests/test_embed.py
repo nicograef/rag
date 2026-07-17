@@ -15,8 +15,8 @@ from rag.embed import EmbedError, embed_law, main, read_chunk_texts
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
-# The chunk fixtures pinned as embed golden files (one flat law, one with merged units).
-GOLDEN_SLUGS = ("kassensichv", "artg")
+# The chunk fixtures pinned as embed golden files (one flat article, one with split parts).
+GOLDEN_SLUGS = ("brentford", "citypark")
 
 
 @pytest.mark.parametrize("slug", GOLDEN_SLUGS)
@@ -37,7 +37,7 @@ def test_embed_is_deterministic(slug: str, tmp_path: Path) -> None:
 
 
 def test_records_are_self_describing_and_order_preserving(tmp_path: Path) -> None:
-    chunks_file = FIXTURES / "chunks" / "kassensichv.jsonl"
+    chunks_file = FIXTURES / "chunks" / "brentford.jsonl"
     output = embed_law(chunks_file, tmp_path, FakeEmbedder())
 
     chunk_ids = [chunk_id for chunk_id, _ in read_chunk_texts(chunks_file)]
@@ -52,7 +52,7 @@ def test_records_are_self_describing_and_order_preserving(tmp_path: Path) -> Non
 
 def test_invalid_chunk_record_raises(tmp_path: Path) -> None:
     chunks_file = tmp_path / "broken.jsonl"
-    chunks_file.write_text('{"id": "x#§ 1"}\n', encoding="utf-8")  # no `text`
+    chunks_file.write_text('{"id": "x#History"}\n', encoding="utf-8")  # no `text`
 
     with pytest.raises(EmbedError, match="line 1"):
         embed_law(chunks_file, tmp_path / "embeddings", FakeEmbedder())
@@ -62,7 +62,8 @@ def test_a_chunk_over_the_token_window_fails_before_writing(tmp_path: Path) -> N
     # FakeEmbedder counts whitespace words as tokens; five words is over the max of three.
     chunks_file = tmp_path / "over.jsonl"
     chunks_file.write_text(
-        json.dumps({"id": "x#§ 1", "text": "ein zwei drei vier fünf"}, ensure_ascii=False) + "\n",
+        json.dumps({"id": "x#History", "text": "one two three four five"}, ensure_ascii=False)
+        + "\n",
         encoding="utf-8",
     )
     embeddings_dir = tmp_path / "embeddings"
@@ -70,16 +71,16 @@ def test_a_chunk_over_the_token_window_fails_before_writing(tmp_path: Path) -> N
     with pytest.raises(EmbedError, match="refusing to silently truncate") as excinfo:
         embed_law(chunks_file, embeddings_dir, FakeEmbedder(max_tokens=3))
 
-    assert "x#§ 1" in str(excinfo.value)
+    assert "x#History" in str(excinfo.value)
     assert not (embeddings_dir / "over.jsonl").exists()  # nothing written on failure
 
 
-def test_main_isolates_a_failing_law_from_the_others(
+def test_main_isolates_a_failing_article_from_the_others(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir()
-    good = (FIXTURES / "chunks" / "kassensichv.jsonl").read_bytes()
+    good = (FIXTURES / "chunks" / "brentford.jsonl").read_bytes()
     (chunks_dir / "good.jsonl").write_bytes(good)
     (chunks_dir / "broken.jsonl").write_text("not json\n", encoding="utf-8")
     embeddings_dir = tmp_path / "embeddings"
@@ -90,8 +91,8 @@ def test_main_isolates_a_failing_law_from_the_others(
     )
 
     assert exit_code == 1
-    assert (embeddings_dir / "good.jsonl").exists()  # the healthy law still embedded
-    assert not (embeddings_dir / "broken.jsonl").exists()  # the failing law wrote nothing
+    assert (embeddings_dir / "good.jsonl").exists()  # the healthy article still embedded
+    assert not (embeddings_dir / "broken.jsonl").exists()  # the failing article wrote nothing
     assert "broken" in capsys.readouterr().err
 
 

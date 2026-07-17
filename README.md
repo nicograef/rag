@@ -34,12 +34,12 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-> **Corpus pivot in progress (fetch & convert verified 2026-07-17):** the **fetch** and
-> **convert** stages now build an **English Wikipedia** corpus (the 20 current Premier League
-> clubs, `clubs.toml`), verified end to end with `make fetch` + `make convert` over all 20
-> articles. Chunking, embed & load, and the online path pivot in later slices — so the
-> quick-start figures and corpus framing below still describe the previous run until the
-> wrap-up slice re-verifies the whole loop.
+> **Corpus pivot in progress (fetch → chunk verified 2026-07-17):** the **fetch**, **convert**,
+> and **chunk** stages now build and slice an **English Wikipedia** corpus (the 20 current
+> Premier League clubs, `clubs.toml`) — verified with `make fetch` → `make chunk` over all 20
+> articles (1,333 chunks, each within the embedding model's 512-token window). Embed & load and
+> the online path pivot in later slices, so the quick-start figures and corpus framing below
+> still describe the previous run until the wrap-up slice re-verifies the whole loop.
 
 Quick start last verified from a clean checkout: **2026-07-14** — every step below as
 written: dev setup, `make db` including the image pull, `make check`, the full pipeline

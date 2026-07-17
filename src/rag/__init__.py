@@ -20,9 +20,9 @@ CORPUS_DIR = Path("data/corpus")
 CHUNKS_DIR = Path("data/chunks")
 EMBEDDINGS_DIR = Path("data/embeddings")
 
-# The corpus-Markdown separator between a heading's designation and its optional title
-# ("§ 1 — Zweck"). Convert writes it and chunk splits on it — defined once here so the
-# writer and the reader cannot drift apart.
+# The citation separator between an article title and its section ("Arsenal F.C. — History").
+# The chunk stage joins the two with it to form each chunk's citation — defined once here so
+# the citation format lives in exactly one place.
 HEADING_SEPARATOR = " — "
 
 

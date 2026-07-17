@@ -19,18 +19,18 @@ from rag.load import LoadError, Row, join_law, main, read_records
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _fixture_records(slug: str = "kassensichv") -> tuple[list[dict], list[dict]]:
-    """One law's chunk records plus matching fake embedding records (dim 8)."""
+def _fixture_records(slug: str = "brentford") -> tuple[list[dict], list[dict]]:
+    """One article's chunk records plus matching fake embedding records (dim 8)."""
     chunks = read_records(FIXTURES / "chunks" / f"{slug}.jsonl")
     embeddings = read_records(FIXTURES / "embeddings" / f"{slug}.jsonl")
     return chunks, embeddings
 
 
 def _generated_records(slug: str, tmp_path: Path) -> tuple[list[dict], list[dict]]:
-    """A law's chunk fixture plus dim-8 fake embeddings generated on the fly.
+    """An article's chunk fixture plus dim-8 fake embeddings generated on the fly.
 
-    tests/fixtures/embeddings/ only ships artg and kassensichv, so laws whose section_path or
-    part we want to exercise get their vectors from `embed_law` into `tmp_path` instead.
+    tests/fixtures/embeddings/ only ships brentford and citypark goldens, so any other article
+    whose part we want to exercise gets its vectors from `embed_law` into `tmp_path` instead.
     """
     chunks_file = FIXTURES / "chunks" / f"{slug}.jsonl"
     embeddings_file = embed_law(chunks_file, tmp_path, FakeEmbedder(dim=8))
@@ -40,7 +40,7 @@ def _generated_records(slug: str, tmp_path: Path) -> tuple[list[dict], list[dict
 def test_join_law_pairs_every_chunk_with_its_vector() -> None:
     chunks, embeddings = _fixture_records()
 
-    rows = join_law("kassensichv", chunks, embeddings, dim=8)
+    rows = join_law("brentford", chunks, embeddings, dim=8)
 
     assert [row.id for row in rows] == [chunk["id"] for chunk in chunks]
     for row, chunk in zip(rows, chunks, strict=True):
@@ -54,14 +54,14 @@ def test_a_chunk_without_an_embedding_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=f"without an embedding: {chunks[-1]['id']}"):
-        join_law("kassensichv", chunks, embeddings[:-1], dim=8)
+        join_law("brentford", chunks, embeddings[:-1], dim=8)
 
 
 def test_an_embedding_without_a_chunk_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=f"without a chunk: {chunks[-1]['id']}"):
-        join_law("kassensichv", chunks[:-1], embeddings, dim=8)
+        join_law("brentford", chunks[:-1], embeddings, dim=8)
 
 
 def test_model_disagreement_across_records_is_an_error() -> None:
@@ -69,14 +69,14 @@ def test_model_disagreement_across_records_is_an_error() -> None:
     embeddings[0]["model"] = "another-model"
 
     with pytest.raises(LoadError, match="disagree on model/dim"):
-        join_law("kassensichv", chunks, embeddings, dim=8)
+        join_law("brentford", chunks, embeddings, dim=8)
 
 
 def test_a_dim_not_matching_the_schema_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=r"does not match the schema's vector\(16\)"):
-        join_law("kassensichv", chunks, embeddings, dim=16)
+        join_law("brentford", chunks, embeddings, dim=16)
 
 
 def test_a_chunk_record_missing_a_field_is_an_error() -> None:
@@ -84,7 +84,7 @@ def test_a_chunk_record_missing_a_field_is_an_error() -> None:
     del chunks[0]["citation"]
 
     with pytest.raises(LoadError, match="missing field 'citation'"):
-        join_law("kassensichv", chunks, embeddings, dim=8)
+        join_law("brentford", chunks, embeddings, dim=8)
 
 
 def test_an_embedding_record_missing_a_field_is_an_error() -> None:
@@ -92,32 +92,25 @@ def test_an_embedding_record_missing_a_field_is_an_error() -> None:
     del embeddings[0]["model"]
 
     with pytest.raises(LoadError, match="missing field 'model'"):
-        join_law("kassensichv", chunks, embeddings, dim=8)
+        join_law("brentford", chunks, embeddings, dim=8)
 
 
 def test_a_chunk_record_slug_not_matching_the_file_is_an_error() -> None:
-    chunks, embeddings = _fixture_records()  # every record's slug is "kassensichv"
+    chunks, embeddings = _fixture_records()  # every record's slug is "brentford"
 
     with pytest.raises(LoadError, match="do not match the file"):
         join_law("other", chunks, embeddings, dim=8)
 
 
 def test_section_path_and_part_survive_the_join(tmp_path: Path) -> None:
-    # strukturg#§ 1 carries a nested (non-empty) section_path; splitg#§ 1#1 a non-null part —
-    # both must reach the joined Row unchanged from the source chunk record.
-    struct_chunks, struct_embeddings = _generated_records("strukturg", tmp_path / "strukturg")
-    split_chunks, split_embeddings = _generated_records("splitg", tmp_path / "splitg")
-    struct_rows = join_law("strukturg", struct_chunks, struct_embeddings, dim=8)
-    split_rows = join_law("splitg", split_chunks, split_embeddings, dim=8)
-    by_id = {row.id: row for row in [*struct_rows, *split_rows]}
+    # citypark#History#1 carries a non-null part; section_path is empty for a top-level
+    # Wikipedia section — both must reach the joined Row unchanged from the source chunk record.
+    chunks, embeddings = _generated_records("citypark", tmp_path / "citypark")
+    by_id = {row.id: row for row in join_law("citypark", chunks, embeddings, dim=8)}
 
-    expected_path = {chunk["id"]: chunk for chunk in struct_chunks}["strukturg#§ 1"]["section_path"]
-    assert expected_path  # the fixture really carries a non-empty path
-    assert by_id["strukturg#§ 1"].section_path == expected_path
-
-    expected_part = {chunk["id"]: chunk for chunk in split_chunks}["splitg#§ 1#1"]["part"]
-    assert expected_part is not None  # the split chunk really carries a part
-    assert by_id["splitg#§ 1#1"].part == expected_part
+    split = by_id["citypark#History#1"]
+    assert split.part == {"index": 1, "total": 2}
+    assert split.section_path == []  # a top-level section has an empty heading trail
 
 
 def test_read_records_reports_the_broken_line(tmp_path: Path) -> None:
@@ -150,7 +143,9 @@ def test_main_without_embeddings_fails_with_a_hint(
 ) -> None:
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir()
-    (chunks_dir / "law.jsonl").write_bytes((FIXTURES / "chunks" / "kassensichv.jsonl").read_bytes())
+    (chunks_dir / "article.jsonl").write_bytes(
+        (FIXTURES / "chunks" / "brentford.jsonl").read_bytes()
+    )
 
     exit_code = main(["--chunks-dir", str(chunks_dir), "--embeddings-dir", str(tmp_path / "no")])
 
@@ -161,7 +156,7 @@ def test_main_without_embeddings_fails_with_a_hint(
 # ── Opt-in integration: a real Postgres (the `test_db` fixture lives in conftest.py) ──
 
 
-def _write_artifacts(tmp_path: Path, slug: str = "kassensichv") -> tuple[Path, Path, int]:
+def _write_artifacts(tmp_path: Path, slug: str = "brentford") -> tuple[Path, Path, int]:
     """Fixture chunks plus real-dimension fake embeddings on disk; returns dirs + row count."""
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir(exist_ok=True)
@@ -213,7 +208,7 @@ def test_rerunning_load_is_idempotent(test_db: psycopg.Connection, tmp_path: Pat
     assert _run_load(chunks_dir, embeddings_dir) == 0
 
     # Change one chunk's text upstream and re-run: same row count, the row updated in place.
-    chunks_file = chunks_dir / "kassensichv.jsonl"
+    chunks_file = chunks_dir / "brentford.jsonl"
     records = [json.loads(line) for line in chunks_file.read_text("utf-8").splitlines()]
     records[0]["text"] = "Ein geänderter Text."
     chunks_file.write_text(
@@ -233,7 +228,7 @@ def test_a_removed_chunk_is_pruned_on_reload(test_db: psycopg.Connection, tmp_pa
     chunks_dir, embeddings_dir, count = _write_artifacts(tmp_path)
     assert _run_load(chunks_dir, embeddings_dir) == 0
 
-    chunks_file = chunks_dir / "kassensichv.jsonl"
+    chunks_file = chunks_dir / "brentford.jsonl"
     lines = chunks_file.read_text(encoding="utf-8").splitlines(keepends=True)
     removed_id = json.loads(lines[-1])["id"]
     chunks_file.write_text("".join(lines[:-1]), encoding="utf-8")
@@ -252,7 +247,7 @@ def test_a_wrong_dimension_artifact_is_rejected(
 ) -> None:
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir()
-    source = FIXTURES / "chunks" / "kassensichv.jsonl"
+    source = FIXTURES / "chunks" / "brentford.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
     embeddings_dir = tmp_path / "embeddings"
     embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM + 1))
@@ -270,25 +265,23 @@ def test_section_path_and_part_round_trip_through_the_database(
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir()
     embeddings_dir = tmp_path / "embeddings"
-    for slug in ("strukturg", "splitg"):
-        source = FIXTURES / "chunks" / f"{slug}.jsonl"
-        (chunks_dir / source.name).write_bytes(source.read_bytes())
-        embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    source = FIXTURES / "chunks" / "citypark.jsonl"
+    (chunks_dir / source.name).write_bytes(source.read_bytes())
+    embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
 
     assert _run_load(chunks_dir, embeddings_dir) == 0
 
-    # section_path is a text[] column → a Python list on the way back.
-    struct = {r["id"]: r for r in read_records(FIXTURES / "chunks" / "strukturg.jsonl")}
-    expected_path = struct["strukturg#§ 1"]["section_path"]
-    assert expected_path  # the fixture really carries a nested, non-empty path
-    row = test_db.execute(
-        "SELECT section_path FROM chunks WHERE id = %s", ("strukturg#§ 1",)
-    ).fetchone()
-    assert row == (expected_path,)
-
     # part is a jsonb column → a dict on the way back.
-    split = {r["id"]: r for r in read_records(FIXTURES / "chunks" / "splitg.jsonl")}
-    expected_part = split["splitg#§ 1#1"]["part"]
+    split = {r["id"]: r for r in read_records(source)}
+    expected_part = split["citypark#History#1"]["part"]
     assert expected_part is not None
-    row = test_db.execute("SELECT part FROM chunks WHERE id = %s", ("splitg#§ 1#1",)).fetchone()
+    row = test_db.execute(
+        "SELECT part FROM chunks WHERE id = %s", ("citypark#History#1",)
+    ).fetchone()
     assert row == (expected_part,)
+
+    # section_path is a text[] column → an empty list for a top-level section.
+    row = test_db.execute(
+        "SELECT section_path FROM chunks WHERE id = %s", ("citypark#History#1",)
+    ).fetchone()
+    assert row == ([],)

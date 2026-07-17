@@ -1,19 +1,19 @@
 """Chunk stage — turn the corpus Markdown into structure-aware chunk records.
 
-Reads each law's Markdown from ``data/corpus/<slug>.md`` (produced by the convert stage)
-and writes one JSONL file per law to ``data/chunks/<slug>.jsonl``: one ``Chunk`` record
-per norm unit (§, Art, Präambel, Eingangsformel, Anlage, …). The corpus Markdown is parsed
-by hand exactly as convert *writes* it — front matter, ATX headings, and blank-line-separated
-body blocks — with no YAML or Markdown library. The transform is deterministic: same corpus
-input, byte-identical JSONL. Any construct the chunker cannot place raises ``ChunkError``
-instead of silently dropping normative text.
+Reads each article's Markdown from ``data/corpus/<slug>.md`` (produced by the convert stage)
+and writes one JSONL file per article to ``data/chunks/<slug>.jsonl``: one ``Chunk`` record
+per Wikipedia **section** (a level-2 ``##`` heading and everything under it, including its
+``###`` subsections). The corpus Markdown is parsed by hand exactly as convert *writes* it —
+front matter, ATX headings, and blank-line-separated body blocks — with no YAML or Markdown
+library. The transform is deterministic: same corpus input, byte-identical JSONL. Any
+construct the chunker cannot place raises ``ChunkError`` instead of silently dropping text.
 
-A unit that fits ``max_chars`` becomes one whole chunk; an oversized unit is split into
-ordered parts — Absatz groups with one-Absatz overlap, a recursive-character fallback for a
-single overlong Absatz, or a whole atomic table (the only over-max chunk, logged). A second
-pass merges consecutive sub-``merge_floor`` whole units that share a ``section_path`` into one
-chunk (never crossing a section boundary, a skipped unit, or the max). Empty-body
-``(weggefallen)`` units emit no chunk.
+A section that fits ``max_chars`` becomes one whole chunk; an oversized section is split into
+ordered parts — subsection groups (``###``) with one-segment overlap, and a recursive-character
+fallback for a single overlong paragraph. A second pass merges consecutive sub-``merge_floor``
+whole sections into one chunk. ``max_chars`` is pinned to keep every chunk within the embed
+model's token window (see the chunk contract for the measured basis); the embed token-guard is
+the hard backstop.
 
 Stage contract: docs/stages/chunk.md
 Theory: docs/theory/chunking.md
@@ -21,37 +21,41 @@ Theory: docs/theory/chunking.md
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from rag import CHUNKS_DIR, CORPUS_DIR, HEADING_SEPARATOR, run_per_source
 
-# Front matter fields the chunk stage consumes (the rest — title, builddate — are ignored).
+# Front matter fields the chunk stage consumes (the rest — e.g. title — are ignored).
 SLUG_KEY = "slug"
 SOURCE_TITLE_KEY = "source_title"
 SOURCE_URL_KEY = "source_url"
 FETCHED_AT_KEY = "fetched_at"
 REQUIRED_KEYS = (SLUG_KEY, SOURCE_TITLE_KEY, SOURCE_URL_KEY, FETCHED_AT_KEY)
 
-# Default size policy: a unit whose `text` exceeds this is split; whole units below the
-# merge floor are candidates to merge with same-section neighbours.
-DEFAULT_MAX_CHARS = 2000
-DEFAULT_MERGE_FLOOR = 500
+# Default size policy. `max_chars` is pinned to keep each chunk within bge-small-en-v1.5's
+# 512-token window. Measured over the fetched 20-club corpus with the model's own tokenizer,
+# the densest chunk text runs ≈ 2.44 chars/token, so 1200 chars is ≤ ~492 tokens even in the
+# worst case — a hard guarantee, not a hope (observed max across the corpus: 375 tokens). The
+# embed token-guard is the backstop if a future article is denser still. See docs/stages/chunk.md,
+# "Verification". A section whose text exceeds `max_chars` is split; whole sections below the
+# merge floor are candidates to merge with neighbours.
+DEFAULT_MAX_CHARS = 1200
+DEFAULT_MERGE_FLOOR = 400
 
-# An Absatz opens at a block whose first line starts with `(1)`, `(2a)`, … (§-paragraph marker).
-ABSATZ_MARKER = re.compile(r"^\(\d+[a-z]?\)")
-
-# The blank line that separates blocks/Absätze in a body (and joins them back into `text`).
+# The blank line that separates blocks (paragraphs / subheadings) in a body and rejoins them.
 BLOCK_SEPARATOR = "\n\n"
 
 # Ordered separators for the recursive character fallback: paragraph → line → sentence → word.
 CHAR_SEPARATORS = (BLOCK_SEPARATOR, "\n", ". ", " ")
 
+# A subsection opens at a block whose first line is a level-3-or-deeper ATX heading (`###`).
+MIN_SUBHEADING_DEPTH = 3
+
 
 class ChunkError(Exception):
-    """Raised when a law's corpus Markdown cannot be chunked faithfully."""
+    """Raised when an article's corpus Markdown cannot be chunked faithfully."""
 
 
 @dataclass(frozen=True)
@@ -71,8 +75,8 @@ class Chunk:
 
 
 @dataclass(frozen=True)
-class NormUnit:
-    """One leaf heading and the material a chunk is built from: its heading, path, and body."""
+class Section:
+    """One article section: its heading, the material a chunk is built from, and its path."""
 
     unit: str
     heading: str
@@ -127,43 +131,29 @@ def _heading_depth(line: str) -> int | None:
     return None
 
 
-def parse_norm_units(lines: list[str]) -> list[NormUnit]:
-    """Parse a law's body (after front matter) into its ordered leaf norm units.
+def parse_sections(lines: list[str]) -> list[Section]:
+    """Parse an article's body (after front matter) into its ordered level-2 sections.
 
-    Applies the leaf rule (a heading is a section iff the next heading is deeper, else a
-    leaf norm unit), tracks the section path via a running stack, and slices each leaf's
-    body as the lines up to the next heading. A section with a non-empty body raises.
+    Each ``##`` heading starts a section whose body runs to the next ``##`` heading and
+    includes any ``###`` subheadings and their text. The H1 article title is not a section;
+    ``###``-and-deeper headings are section content, not section boundaries. The heading trail
+    above a top-level section is only the article title, so ``section_path`` is empty.
     """
     headings = [
         (index, depth) for index, line in enumerate(lines) if (depth := _heading_depth(line))
     ]
     if not headings or headings[0][1] != 1:
-        raise ChunkError("body does not start with an H1 law title")
+        raise ChunkError("body does not start with an H1 article title")
 
-    units: list[NormUnit] = []
-    section_stack: list[tuple[int, str]] = []
-    for position, (line_index, depth) in enumerate(headings):
-        if depth == 1:
-            continue  # the law title (H1) is not a norm unit
-        text = lines[line_index][depth:].strip()
-        next_depth = headings[position + 1][1] if position + 1 < len(headings) else 0
-
-        while section_stack and section_stack[-1][0] >= depth:
-            section_stack.pop()
-        section_path = [heading for _, heading in section_stack]
-
-        if next_depth > depth:  # a section: it has deeper children
-            body_end = headings[position + 1][0]
-            if _body_between(lines, line_index + 1, body_end):
-                raise ChunkError(f"section heading {text!r} has a non-empty body")
-            section_stack.append((depth, text))
-            continue
-
-        body_end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
+    boundaries = [index for index, depth in headings if depth == 2]
+    sections: list[Section] = []
+    for position, line_index in enumerate(boundaries):
+        heading = lines[line_index].strip()
+        title = lines[line_index][2:].strip()
+        body_end = boundaries[position + 1] if position + 1 < len(boundaries) else len(lines)
         body = _body_between(lines, line_index + 1, body_end)
-        unit = text.split(HEADING_SEPARATOR, 1)[0]
-        units.append(NormUnit(unit=unit, heading=text, section_path=section_path, body=body))
-    return units
+        sections.append(Section(unit=title, heading=heading, section_path=[], body=body))
+    return sections
 
 
 def _body_between(lines: list[str], start: int, end: int) -> str:
@@ -178,17 +168,17 @@ def _body_between(lines: list[str], start: int, end: int) -> str:
 
 @dataclass(frozen=True)
 class SplitPart:
-    """One ordered piece of a split unit's body.
+    """One ordered piece of a split section's body.
 
     ``content`` is the *new* body text this part contributes; ``joiner`` is the string that
     reattaches it to the running reconstruction (``""`` for the first part, ``"\n\n"`` when
-    the part starts a fresh Absatz group, ``""`` when it continues a char-split Absatz).
+    the part starts a fresh segment group, ``""`` when it continues a char-split segment).
     ``overlap`` is the duplicated context repeated from the previous part (``""`` for the
-    first part, the previous group's final Absatz for an Absatz-group part, or a trailing
+    first part, the previous group's final segment for a segment-group part, or a trailing
     character window for a char-split part). ``text`` is what the chunk actually carries.
 
-    Only ``text`` reaches the emitted chunk — ``content``, ``joiner``, and ``overlap``
-    exist so the tests can machine-check the no-silent-loss and overlap contracts via
+    Only ``text`` reaches the emitted chunk — ``content``, ``joiner``, and ``overlap`` exist
+    so the tests can machine-check the no-silent-loss and overlap contracts via
     :func:`body_from_parts`.
     """
 
@@ -199,31 +189,31 @@ class SplitPart:
 
 
 def _split_blocks(body: str) -> list[str]:
-    """Split a unit body into its blocks (maximal runs of non-blank lines)."""
+    """Split a section body into its blocks (maximal runs of non-blank lines)."""
     return [block for block in body.split(BLOCK_SEPARATOR) if block]
 
 
-def _is_table_block(block: str) -> bool:
-    """A block is an atomic table when every line is a pipe row or it is a fenced ``table``."""
-    lines = block.split("\n")
-    return all(line.startswith("|") for line in lines) or lines[0] == "```table"
+def _opens_subsection(block: str) -> bool:
+    """True when a block's first line is a ``###``-or-deeper subheading."""
+    depth = _heading_depth(block.split("\n", 1)[0])
+    return depth is not None and depth >= MIN_SUBHEADING_DEPTH
 
 
-def _group_absaetze(body: str) -> list[str]:
-    """Group a body's blocks into Absätze (each an ``\\n\\n``-joined block group).
+def _group_segments(body: str) -> list[str]:
+    """Group a section body's blocks into segments (each an ``\\n\\n``-joined block group).
 
-    A new Absatz opens at a block whose first line matches the ``(1)`` marker; unmarked
-    leading blocks attach to the current Absatz. A body without any marker yields one Absatz
-    per block.
+    A new segment opens at a ``###`` subheading block; the paragraphs that follow it attach
+    to that segment. Blocks before the first subheading (the section's own intro) form the
+    first segment. A section with no subheading yields one segment holding every block, which
+    the recursive-character fallback then splits by paragraph when it is oversized.
     """
-    absaetze: list[list[str]] = []
+    segments: list[list[str]] = []
     for block in _split_blocks(body):
-        opens_absatz = bool(ABSATZ_MARKER.match(block.split("\n", 1)[0]))
-        if opens_absatz or not absaetze:
-            absaetze.append([block])
+        if _opens_subsection(block) or not segments:
+            segments.append([block])
         else:
-            absaetze[-1].append(block)
-    return [BLOCK_SEPARATOR.join(blocks) for blocks in absaetze]
+            segments[-1].append(block)
+    return [BLOCK_SEPARATOR.join(blocks) for blocks in segments]
 
 
 def _char_overlap(max_chars: int) -> int:
@@ -268,21 +258,21 @@ def _split_recursively(text: str, max_chars: int, separators: tuple[str, ...]) -
     return result
 
 
-def _char_split_absatz(
-    absatz: str, heading: str, max_chars: int, leading_joiner: str
+def _char_split_segment(
+    segment: str, heading: str, max_chars: int, leading_joiner: str
 ) -> list[SplitPart]:
-    """Char-split one oversized Absatz into parts, each with a trailing-window overlap.
+    """Char-split one oversized segment into parts, each with a trailing-window overlap.
 
-    The Absatz is fragmented by :func:`_split_recursively` (which preserves separators, so the
-    fragments concatenate back to the Absatz); each non-first fragment repeats the last
+    The segment is fragmented by :func:`_split_recursively` (which preserves separators, so the
+    fragments concatenate back to the segment); each non-first fragment repeats the last
     ``_char_overlap`` characters of the previous fragment so boundary context survives.
-    ``leading_joiner`` reattaches the whole Absatz to the running body during reconstruction
-    (``"\n\n"`` when Absätze precede it, ``""`` when it is the body's first Absatz); the
+    ``leading_joiner`` reattaches the whole segment to the running body during reconstruction
+    (``"\n\n"`` when segments precede it, ``""`` when it is the body's first segment); the
     continuation fragments join with ``""`` because the preserved separators already do so.
     """
     budget = max_chars - len(heading) - len(BLOCK_SEPARATOR)
     overlap_window = min(_char_overlap(max_chars), max(budget // 2, 0))
-    fragments = _split_recursively(absatz, max(budget - overlap_window, 1), CHAR_SEPARATORS)
+    fragments = _split_recursively(segment, max(budget - overlap_window, 1), CHAR_SEPARATORS)
 
     parts: list[SplitPart] = []
     previous = ""
@@ -302,38 +292,38 @@ def _char_split_absatz(
 
 
 def _split_body(body: str, heading: str, max_chars: int) -> list[SplitPart]:
-    """Split an oversized unit body into ordered parts (Absatz groups + char fallback).
+    """Split an oversized section body into ordered parts (segment groups + char fallback).
 
-    Greedily accumulates whole Absätze into a part while heading + one-Absatz overlap +
+    Greedily accumulates whole segments into a part while heading + one-segment overlap +
     content stays ``≤ max_chars``; each non-first group repeats the previous group's final
-    Absatz as overlap (dropped when even the first content Absatz would not otherwise fit —
-    the max invariant wins). A single Absatz that alone overflows falls back to a character
-    split; an atomic oversized table is emitted whole (the only over-max chunk) and logged.
+    segment as overlap (dropped when even the first content segment would not otherwise fit —
+    the max invariant wins). A single segment that alone overflows falls back to a character
+    split.
     """
-    absaetze = _group_absaetze(body)
+    segments = _group_segments(body)
     parts: list[SplitPart] = []
-    previous_absatz = ""  # the final Absatz of the previous group, repeated as overlap
+    previous_segment = ""  # the final segment of the previous group, repeated as overlap
     index = 0
-    while index < len(absaetze):
+    while index < len(segments):
         heading_len = len(heading) + len(BLOCK_SEPARATOR)
-        overlap = previous_absatz
+        overlap = previous_segment
         prefix_len = heading_len + (len(overlap) + len(BLOCK_SEPARATOR) if overlap else 0)
 
-        first = absaetze[index]
+        first = segments[index]
         if prefix_len + len(first) > max_chars:
-            # One Absatz cannot share a part with the overlap: drop the overlap (max wins).
+            # One segment cannot share a part with the overlap: drop the overlap (max wins).
             overlap, prefix_len = "", heading_len
-            if prefix_len + len(first) > max_chars:  # still overflows alone → recurse/atomic
+            if prefix_len + len(first) > max_chars:  # still overflows alone → recurse
                 leading_joiner = BLOCK_SEPARATOR if parts else ""
-                parts.extend(_split_oversized_absatz(first, heading, max_chars, leading_joiner))
-                previous_absatz = first
+                parts.extend(_char_split_segment(first, heading, max_chars, leading_joiner))
+                previous_segment = first
                 index += 1
                 continue
 
         group: list[str] = []
         used = prefix_len
-        while index < len(absaetze):
-            nxt = absaetze[index]
+        while index < len(segments):
+            nxt = segments[index]
             addition = (len(BLOCK_SEPARATOR) if group else 0) + len(nxt)
             if group and used + addition > max_chars:
                 break
@@ -351,40 +341,22 @@ def _split_body(body: str, heading: str, max_chars: int) -> list[SplitPart]:
                 overlap=overlap,
             )
         )
-        previous_absatz = group[-1]
+        previous_segment = group[-1]
     return parts
 
 
-def _split_oversized_absatz(
-    absatz: str, heading: str, max_chars: int, leading_joiner: str
-) -> list[SplitPart]:
-    """Handle a single Absatz that alone overflows: keep a table whole, else char-split it."""
-    if _is_table_block(absatz):
-        chars = len(heading) + len(BLOCK_SEPARATOR) + len(absatz)
-        print(f"  ! oversized table in {heading}: {chars} chars (kept whole)")
-        return [
-            SplitPart(
-                text=f"{heading}{BLOCK_SEPARATOR}{absatz}",
-                content=absatz,
-                joiner=leading_joiner,
-                overlap="",
-            )
-        ]
-    return _char_split_absatz(absatz, heading, max_chars, leading_joiner)
-
-
 def body_from_parts(parts: list[SplitPart]) -> str:
-    """Reconstruct a split unit's body from its parts (the no-silent-loss inverse).
+    """Reconstruct a split section's body from its parts (the no-silent-loss inverse).
 
     Each part contributes only its own ``content`` (never the duplicated ``overlap``),
-    reattached via its ``joiner``; the result must equal the unit's original body verbatim.
+    reattached via its ``joiner``; the result must equal the section's original body verbatim.
     """
     return "".join(part.joiner + part.content for part in parts)
 
 
-def _unit_text(unit: NormUnit) -> str:
-    """The whole ``text`` of a unit: its plain heading, then a blank line, then its body."""
-    return f"{unit.heading}{BLOCK_SEPARATOR}{unit.body}" if unit.body else unit.heading
+def _section_text(section: Section) -> str:
+    """The whole ``text`` of a section: its heading, then a blank line, then its body."""
+    return f"{section.heading}{BLOCK_SEPARATOR}{section.body}" if section.body else section.heading
 
 
 def _build_chunk(
@@ -404,94 +376,91 @@ def _build_chunk(
         source_title=source_title,
         unit=unit,
         section_path=section_path,
-        citation=f"{unit} {source_title}",
+        citation=f"{source_title}{HEADING_SEPARATOR}{unit}",
         source_url=fields[SOURCE_URL_KEY],
         fetched_at=fields[FETCHED_AT_KEY],
         part=part,
     )
 
 
-def _chunks_from_unit(unit: NormUnit, fields: dict[str, str], max_chars: int) -> list[Chunk]:
-    """Build the ``Chunk``(s) for one norm unit: one whole chunk, or ordered split parts."""
+def _chunks_from_section(section: Section, fields: dict[str, str], max_chars: int) -> list[Chunk]:
+    """Build the ``Chunk``(s) for one section: one whole chunk, or ordered split parts."""
     slug = fields[SLUG_KEY]
-    text = _unit_text(unit)
+    text = _section_text(section)
 
     def _chunk(chunk_id: str, chunk_text: str, part: dict[str, int] | None) -> Chunk:
-        return _build_chunk(fields, chunk_id, chunk_text, unit.unit, unit.section_path, part)
+        return _build_chunk(fields, chunk_id, chunk_text, section.unit, section.section_path, part)
 
-    if len(text) <= max_chars or not unit.body:
-        return [_chunk(f"{slug}#{unit.unit}", text, None)]
+    if len(text) <= max_chars or not section.body:
+        return [_chunk(f"{slug}#{section.unit}", text, None)]
 
-    parts = _split_body(unit.body, unit.heading, max_chars)
+    parts = _split_body(section.body, section.heading, max_chars)
     total = len(parts)
-    if total == 1:  # a lone atomic oversized table needs no part numbering
-        return [_chunk(f"{slug}#{unit.unit}", parts[0].text, None)]
+    if total == 1:
+        return [_chunk(f"{slug}#{section.unit}", parts[0].text, None)]
     return [
-        _chunk(f"{slug}#{unit.unit}#{n}", part.text, {"index": n, "total": total})
+        _chunk(f"{slug}#{section.unit}#{n}", part.text, {"index": n, "total": total})
         for n, part in enumerate(parts, start=1)
     ]
 
 
-def _group_len(units: list[NormUnit]) -> int:
-    """The length of the merged ``text`` these units would form (blank-line joined)."""
-    return len(BLOCK_SEPARATOR.join(_unit_text(unit) for unit in units))
+def _group_len(sections: list[Section]) -> int:
+    """The length of the merged ``text`` these sections would form (blank-line joined)."""
+    return len(BLOCK_SEPARATOR.join(_section_text(section) for section in sections))
 
 
-def _flush_group(group: list[NormUnit], fields: dict[str, str], max_chars: int) -> list[Chunk]:
-    """Emit the chunk(s) for one merge group of same-section sub-floor whole units.
+def _flush_group(group: list[Section], fields: dict[str, str], max_chars: int) -> list[Chunk]:
+    """Emit the chunk(s) for one merge group of sub-floor whole sections.
 
     A group of one is a normal single whole chunk (byte-identical to the pre-merge output).
-    A group of two or more becomes one merged chunk: its ``text`` joins the covered units'
-    texts with a blank line, it keys on the FIRST covered unit, and ``unit``/``citation``
-    list every covered unit (``part`` is ``null``).
+    A group of two or more becomes one merged chunk: its ``text`` joins the covered sections'
+    texts with a blank line, it keys on the FIRST covered section, and ``unit``/``citation``
+    list every covered section (``part`` is ``null``).
     """
     if len(group) == 1:
-        return _chunks_from_unit(group[0], fields, max_chars)
+        return _chunks_from_section(group[0], fields, max_chars)
     first = group[0]
-    text = BLOCK_SEPARATOR.join(_unit_text(unit) for unit in group)
-    unit = ", ".join(unit.unit for unit in group)
+    text = BLOCK_SEPARATOR.join(_section_text(section) for section in group)
+    unit = ", ".join(section.unit for section in group)
     chunk = _build_chunk(
         fields, f"{fields[SLUG_KEY]}#{first.unit}", text, unit, first.section_path, None
     )
     return [chunk]
 
 
-def _chunks_from_units(
-    units: list[NormUnit], fields: dict[str, str], max_chars: int, merge_floor: int
+def _chunks_from_sections(
+    sections: list[Section], fields: dict[str, str], max_chars: int, merge_floor: int
 ) -> list[Chunk]:
-    """Turn the ordered norm units into chunks, applying skip, split, and the merge pass.
+    """Turn the ordered sections into chunks, applying skip, split, and the merge pass.
 
-    A unit is a **merge candidate** iff it is WHOLE (its ``text`` fits ``max_chars``, i.e. it
-    was not split) AND shorter than ``merge_floor``. Candidates are gathered into one open
-    group in document order; a unit **flushes** the group when it is empty-body (skipped, a
-    boundary), split, an above-floor whole unit, or a candidate whose ``section_path`` differs
-    from the group's. After a candidate joins, the group flushes once its combined ``text``
-    reaches the floor; a candidate that would push the merged ``text`` over ``max_chars``
-    flushes the group first (the max rule wins over the floor even when ``floor > max``).
+    A section is a **merge candidate** iff it is WHOLE (its ``text`` fits ``max_chars``, i.e.
+    it was not split) AND shorter than ``merge_floor``. Candidates are gathered into one open
+    group in document order; a section **flushes** the group when it is empty-body (skipped),
+    split, or an above-floor whole section. After a candidate joins, the group flushes once
+    its combined ``text`` reaches the floor; a candidate that would push the merged ``text``
+    over ``max_chars`` flushes the group first (the max rule wins over the floor).
     """
     chunks: list[Chunk] = []
-    group: list[NormUnit] = []
+    group: list[Section] = []
 
     def flush() -> None:
         if group:
             chunks.extend(_flush_group(group, fields, max_chars))
             group.clear()
 
-    for unit in units:
-        if not unit.body:
-            flush()  # empty-body (weggefallen) unit — a boundary, emits no chunk
+    for section in sections:
+        if not section.body:
+            flush()  # an empty section — a boundary, emits no chunk
             continue
-        text = _unit_text(unit)
+        text = _section_text(section)
         is_candidate = len(text) <= max_chars and len(text) < merge_floor
         if not is_candidate:
-            flush()  # a split or above-floor whole unit — a boundary, emitted on its own
-            chunks.extend(_chunks_from_unit(unit, fields, max_chars))
+            flush()  # a split or above-floor whole section — a boundary, emitted on its own
+            chunks.extend(_chunks_from_section(section, fields, max_chars))
             continue
-        if group and unit.section_path != group[0].section_path:
-            flush()  # a candidate under a different section — a boundary
-        if group and _group_len([*group, unit]) > max_chars:
+        if group and _group_len([*group, section]) > max_chars:
             flush()  # never push a merged chunk over the max
-        group.append(unit)
+        group.append(section)
         if _group_len(group) >= merge_floor:
             flush()  # the group has reached the floor — start fresh at the next candidate
     flush()
@@ -503,32 +472,31 @@ def chunk_corpus(
     max_chars: int = DEFAULT_MAX_CHARS,
     merge_floor: int = DEFAULT_MERGE_FLOOR,
 ) -> list[Chunk]:
-    """Parse one law's corpus Markdown into its chunk records.
+    """Parse one article's corpus Markdown into its chunk records.
 
-    Emits one chunk per non-empty norm unit that fits ``max_chars``; a unit whose ``text``
-    exceeds it is split into ordered parts (Absatz groups with one-Absatz overlap, or the
-    recursive-character fallback, or a whole atomic table). Consecutive whole units below
-    ``merge_floor`` that share a ``section_path`` are merged into one chunk. A unit whose body
-    strips to the empty string (a ``(weggefallen)`` placeholder) is skipped and is a merge
-    boundary. Raises ``ChunkError`` on a duplicate ``id`` within the law.
+    Emits one chunk per non-empty section that fits ``max_chars``; a section whose ``text``
+    exceeds it is split into ordered parts (subsection groups with one-segment overlap, or the
+    recursive-character fallback). Consecutive whole sections below ``merge_floor`` are merged
+    into one chunk. An empty section emits no chunk. Raises ``ChunkError`` on a duplicate
+    ``id`` within the article.
     """
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines = lines[:-1]  # the file's trailing newline is not a body line
     fields, body_start = parse_front_matter(lines)
 
-    units = parse_norm_units(lines[body_start:])
+    sections = parse_sections(lines[body_start:])
     chunks: list[Chunk] = []
     seen_ids: set[str] = set()
-    for chunk in _chunks_from_units(units, fields, max_chars, merge_floor):
+    for chunk in _chunks_from_sections(sections, fields, max_chars, merge_floor):
         if chunk.id in seen_ids:
-            raise ChunkError(f"duplicate chunk id within law: {chunk.id!r}")
+            raise ChunkError(f"duplicate chunk id within article: {chunk.id!r}")
         seen_ids.add(chunk.id)
         chunks.append(chunk)
     return chunks
 
 
-def chunk_law(
+def chunk_article(
     corpus_file: Path,
     chunks_dir: Path,
     max_chars: int = DEFAULT_MAX_CHARS,
@@ -536,7 +504,7 @@ def chunk_law(
 ) -> Path:
     """Chunk one ``data/corpus/<slug>.md`` into ``chunks_dir/<slug>.jsonl``; returns the path.
 
-    The output file is only written after the whole law parsed successfully.
+    The output file is only written after the whole article parsed successfully.
     """
     chunks = chunk_corpus(corpus_file.read_text(encoding="utf-8"), max_chars, merge_floor)
     chunks_dir.mkdir(parents=True, exist_ok=True)
@@ -547,10 +515,10 @@ def chunk_law(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Chunk every corpus law; returns a non-zero exit code if any failed."""
+    """Chunk every corpus article; returns a non-zero exit code if any failed."""
     parser = argparse.ArgumentParser(
         prog="python -m rag.chunk",
-        description="Chunk law Markdown from data/corpus/ into JSONL under data/chunks/.",
+        description="Chunk article Markdown from data/corpus/ into JSONL under data/chunks/.",
     )
     parser.add_argument("--corpus-dir", type=Path, default=CORPUS_DIR, help="input directory")
     parser.add_argument("--chunks-dir", type=Path, default=CHUNKS_DIR, help="output directory")
@@ -564,7 +532,7 @@ def main(argv: list[str] | None = None) -> int:
     jobs = [
         (
             corpus_file.stem,
-            lambda corpus_file=corpus_file: f"→ {chunk_law(corpus_file, args.chunks_dir)}",
+            lambda corpus_file=corpus_file: f"→ {chunk_article(corpus_file, args.chunks_dir)}",
         )
         for corpus_file in corpus_files
     ]
