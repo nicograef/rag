@@ -149,7 +149,7 @@ def test_unit_at_or_under_max_is_a_single_whole_chunk(tmp_path: Path) -> None:
 FRONT_MATTER = (
     "---\n"
     'slug: "somelaw"\n'
-    'abbreviation: "SomeLaw"\n'
+    'source_title: "SomeLaw"\n'
     'title: "Ein Gesetz"\n'
     'source_url: "https://example.org/somelaw/xml.zip"\n'
     'fetched_at: "2026-07-12T00:00:00+00:00"\n'
@@ -263,7 +263,7 @@ def test_a_merged_chunk_never_exceeds_the_max(tmp_path: Path) -> None:
 
 
 def test_front_matter_missing_a_consumed_key_raises(tmp_path: Path) -> None:
-    # Front matter without `abbreviation` must fail loudly (ChunkError), not with a raw
+    # Front matter without `source_title` must fail loudly (ChunkError), not with a raw
     # KeyError that would escape main()'s per-law isolation.
     corpus_file = tmp_path / "somelaw.md"
     corpus_file.write_text(
@@ -314,7 +314,7 @@ def test_a_malformed_front_matter_line_raises() -> None:
 def test_a_dangling_backslash_in_a_front_matter_value_raises() -> None:
     # A value ending in a lone backslash has nothing to escape — convert never writes this.
     with pytest.raises(ChunkError, match="dangling backslash"):
-        parse_front_matter(["---", 'abbreviation: "bad\\"', "---"])
+        parse_front_matter(["---", 'source_title: "bad\\"', "---"])
 
 
 def test_front_matter_without_a_closing_marker_raises() -> None:

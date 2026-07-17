@@ -16,7 +16,7 @@ from rag.retrieve import RetrievedChunk, RetrieveError
 HITS = [
     RetrievedChunk(
         id="ao#146a",
-        law="AO",
+        source_title="AO",
         citation="§ 146a AO",
         source_url="https://example.test/ao/146a",
         text="Text eins.",
@@ -24,7 +24,7 @@ HITS = [
     ),
     RetrievedChunk(
         id="ao#147",
-        law="AO",
+        source_title="AO",
         citation="§ 147 AO",
         source_url="https://example.test/ao/147",
         text="Text zwei.",

@@ -119,6 +119,11 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 - **Small increments.** Prefer several reviewable steps over one big drop; the developer
   reads every diff to learn from it.
 - **Simple over clever.** Explicit code beats abstractions; no premature generality.
+- **Prune, don't archive.** When a decision or doc is superseded, rewrite it in place to the
+  state that now holds — never leave the stale version beside its replacement as dated
+  history. The public playbook reads as what is true today; only dated *verification* stamps
+  of live facts persist (the rule prunes superseded content, not the verify-before-claiming
+  discipline).
 
 ## Boundaries
 

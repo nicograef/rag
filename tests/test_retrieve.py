@@ -123,7 +123,7 @@ def test_retrieve_returns_ranked_records_and_main_prints_them(
     assert nearest.distance == pytest.approx(0.0, abs=1e-6)
     # All six RetrievedChunk fields carry through from the loaded row.
     assert nearest.id == target["id"]
-    assert nearest.law == target["law"]
+    assert nearest.source_title == target["source_title"]
     assert nearest.citation == target["citation"]
     assert nearest.source_url == target["source_url"]
     assert nearest.text == target["text"]

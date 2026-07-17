@@ -83,6 +83,17 @@ llm:           ## Start the Ollama LLM service (Docker Compose)
 llm-pull:      ## Pull the pinned LLM into the Ollama model volume (needs `make llm`)
 	docker compose exec ollama ollama pull $$(uv run python -c "from rag.generate import MODEL_TAG; print(MODEL_TAG)")
 
+# ── Cleanup / reset ──
+
+.PHONY: clean reset
+
+clean:         ## Remove the regenerable data/ artifacts (raw, corpus, chunks, embeddings)
+	rm -rf data/raw data/corpus data/chunks data/embeddings
+
+reset: clean   ## Clean slate: also drop the chunks table + remove the pinned LLM (needs `make db`, `make llm`)
+	docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "DROP TABLE IF EXISTS chunks;"
+	-docker compose exec -T ollama ollama rm $$(uv run python -c "from rag.generate import MODEL_TAG; print(MODEL_TAG)")
+
 # ── Utilities ──
 
 .PHONY: help

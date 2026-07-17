@@ -1,6 +1,6 @@
 ---
 slug: "tabelleng"
-abbreviation: "TabellenG"
+source_title: "TabellenG"
 title: "Gesetz über Tabellenstrukturen (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/tabelleng/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

@@ -5,6 +5,9 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    # Hard memory cap so the container cannot thrash the 8 GB design floor. The MVP
+    # corpus (a few hundred chunks) needs far less; this only bounds runaway usage.
+    mem_limit: 1g
     # Cap container logs — the json-file driver grows unbounded otherwise and can
     # fill the server disk over time.
     logging:
@@ -29,6 +32,9 @@ services:
   ollama:
     image: ollama/ollama:0.32.1
     restart: unless-stopped
+    # Hard memory cap for the 8 GB floor: granite4:micro (~2.1 GB, Q4_K_M) plus its
+    # num_ctx 4096 KV cache fit comfortably; this bounds it well below the host limit.
+    mem_limit: 5g
     # Same log cap as postgres — the json-file driver grows unbounded otherwise.
     logging:
       driver: json-file

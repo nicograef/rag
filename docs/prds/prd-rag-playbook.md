@@ -44,8 +44,10 @@ The playbook rests on four pillars:
    a learner needs no external course to follow it.
 3. **Honest currency instead of "state of the art".** RAG fashion rots in months. The
    playbook teaches durable building blocks and records its concrete choices (models,
-   parameters, trade-offs) as dated decisions a reader can re-evaluate — it never claims
-   to be the current best.
+   parameters, trade-offs) as dated decisions a reader can re-evaluate. When a choice is
+   superseded, its decision is rewritten in place rather than archived beside the
+   replacement, so the docs state what holds now — the playbook never claims to be the
+   current best, and never reads as a museum of what it used to be.
 4. **Grows chapter by chapter.** The playbook is explicitly incomplete and says so. Each
    landed phase is complete on its own — code, tests, theory chapter, runnable stage. The
    README states landed versus planned truthfully, and every runnable-experience claim is

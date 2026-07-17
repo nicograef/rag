@@ -41,7 +41,7 @@ class RetrievedChunk:
     """One ranked hit — exactly the fields downstream stages consume."""
 
     id: str
-    law: str
+    source_title: str
     citation: str
     source_url: str
     text: str
@@ -83,7 +83,7 @@ def retrieve(question: str, *, embedder: Embedder, top_k: int = TOP_K) -> list[R
             try:
                 rows = connection.execute(
                     f"""
-                    SELECT id, law, citation, source_url, text,
+                    SELECT id, source_title, citation, source_url, text,
                            embedding {DISTANCE_OPERATOR} %(question)s AS distance
                     FROM chunks
                     ORDER BY distance
@@ -101,13 +101,13 @@ def retrieve(question: str, *, embedder: Embedder, top_k: int = TOP_K) -> list[R
     return [
         RetrievedChunk(
             id=chunk_id,
-            law=law,
+            source_title=source_title,
             citation=citation,
             source_url=source_url,
             text=text,
             distance=distance,
         )
-        for chunk_id, law, citation, source_url, text, distance in rows
+        for chunk_id, source_title, citation, source_url, text, distance in rows
     ]
 
 

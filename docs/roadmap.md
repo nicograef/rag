@@ -157,7 +157,11 @@ deliberately left out.
 Recorded as they are made, starting with the clarification rounds at project start (2026-07-10).
 Convention: a decision that binds future work or makes a deliberate exception gets a dated entry
 with its reasoning — context, choice, weighed alternatives, consequences — like the Docker block
-below; trivial choices stay one-line table rows.
+below; trivial choices stay one-line table rows. **Prune, don't archive:** when a later decision
+supersedes an earlier one, the earlier entry is rewritten in place to the choice that now holds —
+not kept beside its replacement as dated history — so the log states what is true now, not an
+audit trail of what was once thought. Dated *verification* stamps of live facts stay (the rule
+prunes superseded decisions, not the verify-before-claiming discipline).
 
 | Decision            | Choice                                                        |
 | ------------------- | ------------------------------------------------------------- |

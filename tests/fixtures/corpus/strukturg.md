@@ -1,6 +1,6 @@
 ---
 slug: "strukturg"
-abbreviation: "StrukturG"
+source_title: "StrukturG"
 title: "Gesetz über die Gliederungsstruktur (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/strukturg/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

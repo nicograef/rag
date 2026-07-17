@@ -27,7 +27,7 @@ def _chunk(citation: str, text: str, distance: float = 0.0) -> RetrievedChunk:
     """A RetrievedChunk with only the two consumed fields set; the rest are placeholders."""
     return RetrievedChunk(
         id="x#1",
-        law="TestG",
+        source_title="TestG",
         citation=citation,
         source_url="https://example.test/x",
         text=text,
@@ -46,7 +46,7 @@ def _golden_chunks() -> list[RetrievedChunk]:
     return [
         RetrievedChunk(
             id=record["id"],
-            law=record["law"],
+            source_title=record["source_title"],
             citation=record["citation"],
             source_url=record["source_url"],
             text=record["text"],

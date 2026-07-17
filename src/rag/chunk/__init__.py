@@ -26,14 +26,14 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from rag import CHUNKS_DIR, CORPUS_DIR, HEADING_SEPARATOR, run_per_law
+from rag import CHUNKS_DIR, CORPUS_DIR, HEADING_SEPARATOR, run_per_source
 
 # Front matter fields the chunk stage consumes (the rest — title, builddate — are ignored).
 SLUG_KEY = "slug"
-LAW_KEY = "abbreviation"
+SOURCE_TITLE_KEY = "source_title"
 SOURCE_URL_KEY = "source_url"
 FETCHED_AT_KEY = "fetched_at"
-REQUIRED_KEYS = (SLUG_KEY, LAW_KEY, SOURCE_URL_KEY, FETCHED_AT_KEY)
+REQUIRED_KEYS = (SLUG_KEY, SOURCE_TITLE_KEY, SOURCE_URL_KEY, FETCHED_AT_KEY)
 
 # Default size policy: a unit whose `text` exceeds this is split; whole units below the
 # merge floor are candidates to merge with same-section neighbours.
@@ -61,7 +61,7 @@ class Chunk:
     id: str
     text: str
     slug: str
-    law: str
+    source_title: str
     unit: str
     section_path: list[str]
     citation: str
@@ -396,15 +396,15 @@ def _build_chunk(
     part: dict[str, int] | None,
 ) -> Chunk:
     """Assemble one ``Chunk`` record, filling the provenance fields from the front matter."""
-    law = fields[LAW_KEY]
+    source_title = fields[SOURCE_TITLE_KEY]
     return Chunk(
         id=chunk_id,
         text=text,
         slug=fields[SLUG_KEY],
-        law=law,
+        source_title=source_title,
         unit=unit,
         section_path=section_path,
-        citation=f"{unit} {law}",
+        citation=f"{unit} {source_title}",
         source_url=fields[SOURCE_URL_KEY],
         fetched_at=fields[FETCHED_AT_KEY],
         part=part,
@@ -568,4 +568,4 @@ def main(argv: list[str] | None = None) -> int:
         )
         for corpus_file in corpus_files
     ]
-    return run_per_law("chunk", jobs, (ChunkError, OSError))
+    return run_per_source("chunk", jobs, (ChunkError, OSError))

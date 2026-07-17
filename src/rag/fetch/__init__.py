@@ -21,7 +21,7 @@ from pathlib import Path
 
 import httpx
 
-from rag import RAW_DIR, run_per_law
+from rag import RAW_DIR, run_per_source
 
 DOWNLOAD_URL = "https://www.gesetze-im-internet.de/{slug}/xml.zip"
 TIMEOUT_SECONDS = 30.0
@@ -93,4 +93,4 @@ def _fetch_all(client: httpx.Client, laws: dict[str, str], raw_dir: Path) -> int
         (f"{slug} ({label})", lambda slug=slug: f"→ {', '.join(fetch_law(client, slug, raw_dir))}")
         for slug, label in laws.items()
     ]
-    return run_per_law("fetch", jobs, (httpx.HTTPError, zipfile.BadZipFile))
+    return run_per_source("fetch", jobs, (httpx.HTTPError, zipfile.BadZipFile))

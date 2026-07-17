@@ -221,7 +221,7 @@ def test_a_bold_run_renders_markdown_bold(tmp_path: Path) -> None:
 
 def test_abbreviation_escaping_round_trips_through_convert_and_chunk(tmp_path: Path) -> None:
     # An <amtabk> carrying both a `"` and a `\` must survive convert's front-matter escaping
-    # and chunk's unescape byte-for-byte, so the chunk's `law` equals the source abbreviation.
+    # and chunk's unescape byte-for-byte, so the chunk's `source_title` equals the source value.
     abbreviation = 'A"B\\C'
     header = (
         f"<norm><metadaten><amtabk>{abbreviation}</amtabk>"
@@ -238,7 +238,7 @@ def test_abbreviation_escaping_round_trips_through_convert_and_chunk(tmp_path: P
 
     (chunk,) = chunk_corpus(markdown)
 
-    assert chunk.law == abbreviation
+    assert chunk.source_title == abbreviation
 
 
 # ── Guard tests: inputs the converter cannot render faithfully fail loudly ──

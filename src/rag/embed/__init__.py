@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
-from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_law
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_source
 
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
 # model, normalization, and pgvector distance operator are chosen together — the reasoning
@@ -165,4 +165,4 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
         )
         for chunks_file in chunks_files
     ]
-    return run_per_law("embed", jobs, (EmbedError, OSError))
+    return run_per_source("embed", jobs, (EmbedError, OSError))

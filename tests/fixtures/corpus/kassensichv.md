@@ -1,6 +1,6 @@
 ---
 slug: "kassensichv"
-abbreviation: "KassenSichV"
+source_title: "KassenSichV"
 title: "Verordnung zur Bestimmung der technischen Anforderungen an elektronische Aufzeichnungs- und Sicherungssysteme im Geschäftsverkehr"
 source_url: "https://www.gesetze-im-internet.de/kassensichv/xml.zip"
 fetched_at: "2026-07-12T09:26:05+00:00"

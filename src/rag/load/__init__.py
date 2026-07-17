@@ -30,7 +30,7 @@ from pgvector import Vector
 from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
 
-from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_law
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_source
 from rag.embed import EMBEDDING_DIM
 
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
@@ -45,7 +45,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS chunks (
     id text PRIMARY KEY,
     slug text,
-    law text,
+    source_title text,
     unit text,
     section_path text[],
     citation text,
@@ -70,7 +70,7 @@ class Row:
 
     id: str
     slug: str
-    law: str
+    source_title: str
     unit: str
     section_path: list[str]
     citation: str
@@ -137,7 +137,7 @@ def join_law(
             Row(
                 id=record["id"],
                 slug=record["slug"],
-                law=record["law"],
+                source_title=record["source_title"],
                 unit=record["unit"],
                 section_path=record["section_path"],
                 citation=record["citation"],
@@ -185,11 +185,11 @@ def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None
     with connection.transaction(), connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO chunks (id, slug, law, unit, section_path, citation,
+            INSERT INTO chunks (id, slug, source_title, unit, section_path, citation,
                                 source_url, fetched_at, part, text, embedding)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
-                slug = EXCLUDED.slug, law = EXCLUDED.law, unit = EXCLUDED.unit,
+                slug = EXCLUDED.slug, source_title = EXCLUDED.source_title, unit = EXCLUDED.unit,
                 section_path = EXCLUDED.section_path, citation = EXCLUDED.citation,
                 source_url = EXCLUDED.source_url, fetched_at = EXCLUDED.fetched_at,
                 part = EXCLUDED.part, text = EXCLUDED.text, embedding = EXCLUDED.embedding
@@ -198,7 +198,7 @@ def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None
                 (
                     row.id,
                     row.slug,
-                    row.law,
+                    row.source_title,
                     row.unit,
                     row.section_path,
                     row.citation,
@@ -278,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for slug in slugs
             ]
-            return run_per_law("load", jobs, (LoadError, OSError))
+            return run_per_source("load", jobs, (LoadError, OSError))
     except psycopg.OperationalError as error:
         print(f"database connection failed: {error} — run `make db` first", file=sys.stderr)
         return 1

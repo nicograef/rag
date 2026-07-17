@@ -1,6 +1,6 @@
 ---
 slug: "artg"
-abbreviation: "ArtG"
+source_title: "ArtG"
 title: "Artikelgesetz für Verfassungsstrukturen (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/artg/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

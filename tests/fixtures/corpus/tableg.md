@@ -1,6 +1,6 @@
 ---
 slug: "tableg"
-abbreviation: "TableG"
+source_title: "TableG"
 title: "Gesetz mit einer überlangen Tabelle (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/tableg/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

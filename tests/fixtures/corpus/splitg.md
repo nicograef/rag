@@ -1,6 +1,6 @@
 ---
 slug: "splitg"
-abbreviation: "SplitG"
+source_title: "SplitG"
 title: "Gesetz mit einem überlangen Paragraphen (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/splitg/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

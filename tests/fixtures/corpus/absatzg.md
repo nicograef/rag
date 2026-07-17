@@ -1,6 +1,6 @@
 ---
 slug: "absatzg"
-abbreviation: "AbsatzG"
+source_title: "AbsatzG"
 title: "Gesetz mit einem überlangen Absatz (Testfixture)"
 source_url: "https://www.gesetze-im-internet.de/absatzg/xml.zip"
 fetched_at: "2026-07-12T00:00:00+00:00"

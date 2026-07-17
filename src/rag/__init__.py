@@ -26,19 +26,19 @@ EMBEDDINGS_DIR = Path("data/embeddings")
 HEADING_SEPARATOR = " — "
 
 
-def run_per_law(
+def run_per_source(
     stage: str,
     jobs: Iterable[tuple[str, Callable[[], str]]],
     errors: tuple[type[Exception], ...],
 ) -> int:
-    """Run one stage's per-law jobs under the shared isolation contract, defined once here.
+    """Run one stage's per-source jobs under the shared isolation contract, defined once here.
 
-    Each job is ``(name, work)``; ``work()`` does one law's work and returns the detail
+    Each job is ``(name, work)``; ``work()`` does one source's work and returns the detail
     printed after ``✓ <name>``. A job that raises one of ``errors`` is reported on stderr
-    (``✗ <name>: <error>``) and recorded — the remaining laws still run — and the stage
-    exits non-zero if any law failed. Callers building jobs in a comprehension must bind
-    the loop variable as a lambda default (``lambda law=law: ...``): a lambda looks names
-    up late, so without it every job would work on the last law.
+    (``✗ <name>: <error>``) and recorded — the remaining sources still run — and the stage
+    exits non-zero if any source failed. Callers building jobs in a comprehension must bind
+    the loop variable as a lambda default (``lambda item=item: ...``): a lambda looks names
+    up late, so without it every job would work on the last item.
     """
     failed: list[str] = []
     for name, work in jobs:

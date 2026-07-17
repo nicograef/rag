@@ -22,7 +22,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from rag import CORPUS_DIR, HEADING_SEPARATOR, RAW_DIR, run_per_law
+from rag import CORPUS_DIR, HEADING_SEPARATOR, RAW_DIR, run_per_source
 
 # Footnote references: their markers are dropped per the licensing decision.
 INLINE_IGNORED = {"FnR"}
@@ -104,7 +104,7 @@ def render_markdown(root: etree._Element, provenance: Provenance) -> str:
     front_matter = _front_matter(
         {
             "slug": provenance.slug,
-            "abbreviation": _abbreviation(header),
+            "source_title": _abbreviation(header),
             "title": title,
             "source_url": provenance.source_url,
             "fetched_at": provenance.fetched_at,
@@ -541,4 +541,4 @@ def main(argv: list[str] | None = None) -> int:
         (law_dir.name, lambda law_dir=law_dir: f"→ {convert_law(law_dir, args.corpus_dir)}")
         for law_dir in sorted(path for path in args.raw_dir.iterdir() if path.is_dir())
     ]
-    return run_per_law("convert", jobs, (ConversionError, OSError, etree.LxmlError))
+    return run_per_source("convert", jobs, (ConversionError, OSError, etree.LxmlError))
