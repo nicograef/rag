@@ -77,7 +77,5 @@ embed exits non-zero with a hint to run `make chunk` first.
 ## Downstream consumers
 
 **[load](load.md)** joins these records with the chunk records by `id` and writes both
-into the vector store. **Phase 4's retrieve stage** must embed questions with the same
-pinned model — the deliberate coupling recorded in the model decision. The dev
-verification command ([`python -m rag.query`](load.md#verification)) already does exactly
-that.
+into the vector store. **Phase 4's [retrieve stage](retrieve.md)** must embed questions
+with the same pinned model — the deliberate coupling recorded in the model decision.

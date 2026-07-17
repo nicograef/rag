@@ -31,7 +31,7 @@ in the [roadmap](docs/roadmap.md).
 | 1 — Fetch & convert                  | fetch, convert                          | ✅     |
 | 2 — Structure-aware chunking         | chunk                                   | ✅     |
 | 3 — Embed & load                     | embed, load                             | ✅     |
-| 4 — Online PoC                       | retrieve, assemble, generate            | ⬜     |
+| 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
 Quick start last verified from a clean checkout: **2026-07-14** — every step below as
@@ -40,10 +40,19 @@ on the live corpus (`make fetch` through `make load`, 1,225 chunks — the first
 `make embed` including the model download), and a `make query` retrieval spot-check
 (recorded in the [load contract](docs/stages/load.md#verification)).
 
+Phase 4 verified end to end: **2026-07-17** — the full offline pipeline re-run from a
+live `make fetch` through `make load` (1,225 chunks), then `make llm`, `make llm-pull`,
+and real `make ask` runs (the dated spot-check in the
+[generate contract](docs/stages/generate.md#verification)). That run used an 8-core /
+5.7 GB machine — *below* the 16 GB design floor: serving works with the pinned 4B model
+but takes minutes per answer there (measured numbers in the
+[generation-model decision](docs/roadmap.md#decisions)), and `make embed`'s pinned batch
+size needs the floor, so the embed step ran with a reduced batch.
+
 ## Quick start
 
-What runs today (Phases 0–3): the dev setup, the checks, the database, and the whole
-offline ingestion pipeline.
+What runs today (Phases 0–4): the dev setup, the checks, the database, the whole
+offline ingestion pipeline, and the online question-answering loop.
 
 ```bash
 bash scripts/setup-dev-tools.sh   # install uv + sync Python dependencies (idempotent)
@@ -55,7 +64,10 @@ make convert                      # convert it into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
 make embed                        # embed the chunks (first run downloads the model, ~4.6 GB)
 make load                         # fill the chunks table + HNSW index in Postgres
-make query Q="Wie müssen elektronische Kassen gesichert werden?"   # Phase-3 retrieval spot-check (Phase 4's retrieve stage supersedes it)
+make query Q="Wie müssen elektronische Kassen gesichert werden?"   # retrieval-only check (the retrieve stage)
+make llm                          # start Ollama (Docker Compose)
+make llm-pull                     # pull the pinned LLM (~2.5 GB) into the model volume
+make ask Q="Wann entsteht die Umsatzsteuer?"   # grounded answer with § citations (CPU: expect minutes)
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
@@ -70,9 +82,10 @@ one-time ~160 MB (compressed) pull of the
 four-law MVP corpus, and a one-time **~4.6 GB download of the pinned embedding model**
 (`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed` — the 2.27 GB
 weights land twice, as `pytorch_model.bin` plus the safetensors conversion (details in
-the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds more** — open-weight
-LLM weights via Ollama. Those costs are documented here when their phases land; until
-the status table above marks a phase ✅, its downloads and commands don't exist yet.
+the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds** (measured
+2026-07-17): a one-time pull of the pinned `ollama/ollama:0.32.1` image (≈ 8 GB on
+disk) and a one-time **~2.5 GB download of the pinned LLM** (`qwen3:4b-instruct`,
+4-bit GGUF) into the named Docker volume on the first `make llm-pull`.
 
 ## Pipeline overview
 
@@ -88,15 +101,16 @@ on disk or database state:
 | **[embed](docs/stages/embed.md)**     | turn text into vectors  | chunk records → vectors (JSONL per law) |
 | **[load](docs/stages/load.md)**       | own the database (incl. schema and indexes) | chunk records + vectors → database |
 
-The **online path** answers a question in one process. Its contract is a documented entry
-point plus step-level logs of every intermediate (query, retrieved chunks with scores,
-assembled prompt, answer):
+The **online path** answers a question in one process — `make ask` wraps
+`python -m rag.ask`, which composes the three stages and logs every intermediate (query,
+retrieved chunks with scores, assembled prompt size, generation stats) to stderr while
+the answer streams to stdout:
 
 | Stage        | Responsibility                              | Entry point + step logs        |
 | ------------ | ------------------------------------------- | ------------------------------ |
-| **retrieve** | question → ranked chunks                    | logs query + chunks with scores |
-| **assemble** | question + ranked chunks → prompt           | logs the assembled prompt      |
-| **generate** | prompt → grounded answer with citations     | logs the final answer          |
+| **[retrieve](docs/stages/retrieve.md)** | question → ranked chunks         | logs query + chunks with scores |
+| **[assemble](docs/stages/assemble.md)** | question + ranked chunks → prompt | logs the assembled prompt      |
+| **[generate](docs/stages/generate.md)** | prompt → grounded answer with citations | logs the final answer    |
 
 **evaluate** is a cross-cutting harness, not a pipeline stage: a checked-in gold-question
 set plus a pinned configuration in, a dated metrics report out.
@@ -110,7 +124,10 @@ licensing, and lossless parsing are RAG decisions; the Phase 2 chapter,
 structure-aware chunking beats fixed-size splitting for law texts; the Phase 3 chapters,
 [embeddings](docs/theory/embeddings.md) and
 [vector indexes](docs/theory/vector-indexes.md), explain how meaning becomes geometry and
-how HNSW searches it fast. See the status table above for what exists today.
+how HNSW searches it fast; the Phase 4 chapter,
+[LLM generation](docs/theory/llm-generation.md), explains how a quantized model turns a
+prompt into streamed tokens on a CPU — prefill vs decode, KV caching, and the prompt
+techniques that keep answers grounded. See the status table above for what exists today.
 The [concept map](docs/concepts.md) indexes every RAG concept the playbook tracks — a
 one-line definition each, plus where it lives: a phase, a backlog item, a theory chapter,
 or a recorded reason it is deliberately out of scope.

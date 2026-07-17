@@ -69,12 +69,12 @@ in the same change.
 
 | Concept | Definition | Place |
 | ------- | ---------- | ----- |
-| Semantic search | Finding documents by meaning: query and documents embedded into one vector space, ranked by similarity (typically cosine). | Phase 3 (similarity queries verified against the store) + Phase 4 (retrieve stage end to end). |
+| Semantic search | Finding documents by meaning: query and documents embedded into one vector space, ranked by similarity (typically cosine). | Phase 3 (similarity queries verified against the store) + Phase 4 ([retrieve stage](stages/retrieve.md) end to end). |
 | Keyword / lexical retrieval (BM25) | Matching on exact terms scored by term statistics (TF, IDF, length normalization), with BM25 as the standard function. | Backlog 2 — Postgres full-text as BM25-style retrieval. |
 | Hybrid search | Running dense and sparse retrieval in parallel and merging results, so paraphrases and exact terms are both catchable. | Backlog 2. |
 | Reciprocal rank fusion (RRF) | Merging ranked lists by summing 1/(k + rank) per document — no score calibration between retrievers needed. | Backlog 2. |
 | Score normalization / weighted fusion | Merging results by normalizing incomparable raw scores to a common scale and combining as a weighted sum. | Theory — hybrid-search chapter (Backlog 2), as the alternative RRF deliberately sidesteps. |
-| Top-k results | Truncating a ranked list to the k highest-scoring chunks, trading recall against prompt size and noise. | Phase 4 — k is pinned as a dated decision when the phase lands; a `k=5` default already ships in the dev query verification tool (`src/rag/query`), but the real pinning still waits for Phase 4. |
+| Top-k results | Truncating a ranked list to the k highest-scoring chunks, trading recall against prompt size and noise. | Phase 4 — `TOP_K = 5` is pinned in the [retrieve stage](stages/retrieve.md) (`src/rag/retrieve/`) by the dated [generation-model decision](roadmap.md#decisions); `--top-k` overrides it per run. |
 | Metadata filtering | Restricting retrieval to chunks whose metadata matches structured conditions, applied before or after the vector search. | Backlog 3. |
 | Cross-encoder reranking | A second precision pass scoring each (query, candidate) pair jointly through one transformer forward pass. | Backlog 5. |
 | ColBERT / late interaction | Storing one embedding per token and scoring by token-level query-document interactions (MaxSim) — between bi-encoders and cross-encoders. | Theory — cross-encoders chapter (Backlog 5), as part of the retrieval-architecture spectrum. |
@@ -96,16 +96,16 @@ in the same change.
 
 | Concept | Definition | Place |
 | ------- | ---------- | ----- |
-| Prompt assembly / context packing | Deterministically formatting instructions, question, and retrieved chunks (with citations) into one stable prompt. | Phase 4 — the assemble stage. |
+| Prompt assembly / context packing | Deterministically formatting instructions, question, and retrieved chunks (with citations) into one stable prompt. | Phase 4 — the [assemble stage](stages/assemble.md). |
 | Context window management | Deciding how much and which content fits the model's token budget without truncation or waste. | Backlog 7. |
 | Lost in the middle | The finding that LLMs use information at the edges of a long context far better than information buried in the middle. | Backlog 7 — ordering as the counter-measure; the chapter cites the primary source. |
-| Prompt caching | Reusing the computed state of a static prompt prefix across requests, cutting latency (and cost on metered APIs). | Theory — llm-generation chapter (Phase 4): the cloud-cost variant is inapplicable; the local analogue (prompt-prefix/KV reuse in llama.cpp) motivates the assemble stage's stable layout. |
-| KV caching | Storing key/value attention tensors of processed tokens so each new token attends to cached state instead of recomputing the prefix. | Theory — llm-generation chapter (Phase 4): managed by llama.cpp inside Ollama; nothing to build, everything to understand (prefill vs decode speed on CPU). |
-| Groundedness | The property that an answer's claims are supported solely by the retrieved context, not the model's parametric memory. | Phase 4 (the generate contract: grounded answer with citations) + Backlog 1 (measured) + Backlog 9 (runtime check). |
-| Hallucination prevention | Prompt-level techniques reducing fabricated answers: grounding phrasing ("according to …") and explicit abstention instructions. | Phase 4 — abstention and grounding directives in the assembled system prompt; techniques named in the phase's chapter. |
-| Chain-of-thought (CoT) | Instructing the model to produce explicit intermediate reasoning before its final answer. | Theory — llm-generation chapter (Phase 4): why it helps a small quantized model and what it costs in output tokens on CPU. |
+| Prompt caching | Reusing the computed state of a static prompt prefix across requests, cutting latency (and cost on metered APIs). | Theory — [llm-generation chapter](theory/llm-generation.md) (Phase 4): the cloud-cost variant is inapplicable; the local analogue (prompt-prefix/KV reuse in llama.cpp) motivates the assemble stage's stable layout. |
+| KV caching | Storing key/value attention tensors of processed tokens so each new token attends to cached state instead of recomputing the prefix. | Theory — [llm-generation chapter](theory/llm-generation.md) (Phase 4): managed by llama.cpp inside Ollama; nothing to build, everything to understand (prefill vs decode speed on CPU). |
+| Groundedness | The property that an answer's claims are supported solely by the retrieved context, not the model's parametric memory. | Phase 4 (the [generate contract](stages/generate.md): grounded answer with citations) + Backlog 1 (measured) + Backlog 9 (runtime check). |
+| Hallucination prevention | Prompt-level techniques reducing fabricated answers: grounding phrasing ("according to …") and explicit abstention instructions. | Phase 4 — abstention and grounding directives in the [assembled system prompt](stages/assemble.md); techniques named in the [llm-generation chapter](theory/llm-generation.md). |
+| Chain-of-thought (CoT) | Instructing the model to produce explicit intermediate reasoning before its final answer. | Theory — [llm-generation chapter](theory/llm-generation.md) (Phase 4): why it helps a small quantized model and what it costs in output tokens on CPU. |
 | Chain-of-verification (CoVe) | Draft an answer, generate verification questions about its claims, answer them against the context, revise. | Backlog 9 — the groundedness output check is CoVe-style self-checking with the local LLM. |
-| LLM weight quantization (GGUF) | Compressing model weights to lower precision (e.g. 4-bit GGUF) so a 7–8B model fits in RAM and runs on CPU. | Theory — llm-generation chapter (Phase 4); the served model is a quantized GGUF by design. |
+| LLM weight quantization (GGUF) | Compressing model weights to lower precision (e.g. 4-bit GGUF) so a 7–8B model fits in RAM and runs on CPU. | Theory — [llm-generation chapter](theory/llm-generation.md) (Phase 4); the served model is a quantized GGUF by design. |
 
 ## Security & guardrails
 

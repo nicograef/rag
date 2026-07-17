@@ -25,7 +25,7 @@ phased plan and all recorded decisions;
 | Pipeline   | Python 3.12, uv (venv + lockfile), ruff, pytest                   |
 | Database   | PostgreSQL 17 + pgvector (Docker Compose)                         |
 | Embeddings | sentence-transformers, CPU-only — `BAAI/bge-m3` (pinned 2026-07-14) |
-| LLM        | Ollama serving open-weight GGUF models (CPU)                      |
+| LLM        | Ollama serving `qwen3:4b-instruct` GGUF (CPU) — pinned 2026-07-17 |
 | Corpus     | German federal law XML from gesetze-im-internet.de → Markdown     |
 | Future app | Go backend, React frontend (not started — pipeline first)         |
 
@@ -43,7 +43,10 @@ All commands via Makefile in the project root (`make help` for the full list).
 | `make chunk`    | Chunk the Markdown corpus into JSONL under `data/chunks/` |
 | `make embed`    | Embed chunk records into vector JSONL under `data/embeddings/` |
 | `make load`     | Load chunks + embeddings into Postgres/pgvector (needs `make db`) |
-| `make query`    | Verify retrieval: `make query Q="<question>"` (top-k search) |
+| `make query`    | Verify retrieval via the retrieve stage: `make query Q="<question>"` |
+| `make ask`      | Ask a question end to end: `make ask Q="<question>"` (retrieve → assemble → generate) |
+| `make llm`      | Start the Ollama LLM service (Docker Compose)  |
+| `make llm-pull` | Pull the pinned LLM into the Ollama model volume |
 | `make check`    | Lint + types + tests (run before claiming work done) |
 | `make lint`     | ruff check + format check                      |
 | `make typecheck`| ty static type checking                        |

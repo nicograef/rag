@@ -92,12 +92,12 @@ command prints).
 ## Verification
 
 The phase's success criterion — "plausible §§ for hand-written test queries" — is
-reproducible with the dev query command (a thin verification tool, explicitly not the
-Phase 4 retrieve stage; it will be superseded there):
+reproducible through the Phase 4 [retrieve stage](retrieve.md), which superseded the Phase 3
+dev query command (same pinned model, same query shape):
 
 ```sh
 make query Q="Wie müssen elektronische Kassen gesichert werden?"   # wraps:
-uv run python -m rag.query "<question>"                            # options: --top-k 5
+uv run python -m rag.retrieve "<question>"                         # options: --top-k 5
 ```
 
 It embeds the question with the same pinned model and prints the top-k rows ordered by
@@ -105,8 +105,10 @@ It embeds the question with the same pinned model and prints the top-k rows orde
 
 **Spot-check (2026-07-14):** run against a store filled by the full pipeline on the live
 corpus that day (`make fetch && make convert && make chunk && make embed && make load`,
-1,225 chunks). Four hand-written questions with known expected §§ — **all four returned
-the expected § at rank 1** (distance = cosine, lower is better):
+1,225 chunks), using the since-superseded dev query command — same pinned model and query
+shape as the retrieve stage, so the results still describe it. Four hand-written questions
+with known expected §§ — **all four returned the expected § at rank 1** (distance = cosine,
+lower is better):
 
 | Question | Expected | Top hits (rank · distance · citation) |
 | --- | --- | --- |
@@ -126,6 +128,5 @@ Backlog 1.
 
 ## Downstream consumers
 
-**Phase 4's retrieve stage** searches this table (`ORDER BY embedding <=> $query`) and
-filters/cites on the metadata columns. The dev query command above is its minimal
-predecessor.
+**Phase 4's [retrieve stage](retrieve.md)** searches this table (`ORDER BY embedding <=>
+$query`) and filters/cites on the metadata columns.

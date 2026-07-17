@@ -67,7 +67,7 @@ Goal: embeddings for every chunk, stored and indexed in Postgres.
 - Verify: `SELECT ... ORDER BY embedding <=> query` returns plausible §§ for hand-written
   test queries.
 
-## Phase 4 — Online PoC (CLI question answering) ⬜
+## Phase 4 — Online PoC (CLI question answering) ✅
 
 Stages: **retrieve**, **assemble**, **generate**
 
@@ -302,6 +302,98 @@ downstream.
   Phase 4 must use the same pinned model; retrieval-quality claims stay anecdotal until the
   evaluation harness (Backlog 1); the model download cost is stated in the README quick
   start.
+
+**Generation model — qwen3:4b-instruct** (decided 2026-07-17): the LLM, its context
+length, decoding parameters, and the retrieval top-k, pinned together for Phase 4's
+online path.
+
+- **Context:** Phase 4 needs an open-weight instruct model served by Ollama on the
+  CPU-only floor, answering German legal questions grounded in retrieved §§. During
+  planning the roadmap's "open-weight" wording was resolved to a **strict open-source
+  bar** — Apache-2.0/MIT-class weights only, per rule 1 in [AGENTS.md](../AGENTS.md);
+  community-licensed weights (Llama, Gemma) are out even where German benchmarks favor
+  them. Retrieval k, chunk sizes, and the model's context length form one context
+  budget, so they are pinned in one decision. All external claims below were verified
+  live 2026-07-17 — Hugging Face model cards, ollama.com library pages, the EuroEval
+  German leaderboard (v17.6.0), and the Ollama docs corroborated by an empirical probe
+  of the pinned image.
+- **Choice:** **`qwen3:4b-instruct`** (Qwen3-4B-Instruct-2507, Q4_K_M GGUF, 2.5 GB
+  download, Apache-2.0 per the model card), served by the pinned Compose service
+  `ollama/ollama:0.32.1`; **`num_ctx` 8192** with **`num_predict` 1024**; decoding per
+  the model card's recommendation — **temperature 0.7, top_p 0.8, top_k 20, min_p 0** —
+  plus a pinned **seed 42**; retrieval **top-k 5**. The values live as constants in
+  [`src/rag/generate/`](../src/rag/generate/__init__.py) and
+  [`src/rag/retrieve/`](../src/rag/retrieve/__init__.py); the Makefile derives the
+  `make llm-pull` tag from the constant instead of duplicating the string.
+- **Why qwen3:4b-instruct:**
+  - **Strict license, verified.** Weights Apache-2.0 (HF card, 2026-07-17), in the
+    official Ollama library — no community re-uploads of unverifiable provenance.
+  - **Best verified German in its class.** EuroEval German (accessed 2026-07-17,
+    mean rank, lower is better): Qwen3-4B no-thinking ≈ 2.22, ahead of
+    granite-4.0-micro 2.28, SmolLM3-3B 2.75, EuroLLM-1.7B 3.42. The Apache 7–8B tier
+    tops out at Qwen3-8B (2.09) — see the floor note below.
+  - **Non-thinking by design.** The 2507 Instruct build emits no `<think>` traces, so
+    the client stays minimal (no `think` field, nothing to strip) and chain-of-thought
+    remains a deliberate theory topic ([llm-generation](theory/llm-generation.md))
+    instead of an accidental default.
+  - **Hardware honesty.** This phase was implemented and verified on an 8-core /
+    5.7 GB machine — *below* the playbook's 16 GB design floor. A 7–8B Q4 model
+    (4.4–5.2 GB weights) cannot serve there at all, and the playbook pins only what it
+    actually ran end to end (verify before claiming). On a 16 GB machine,
+    **`qwen3:8b`** (Apache-2.0, the best strict-open German score) is the documented
+    upgrade path: swap `MODEL_TAG`, re-run `make llm-pull` and the spot-check.
+- **Deviation from temperature 0:** the plan defaulted to greedy decoding unless
+  in-phase research recorded a reason to deviate. It did: the Qwen3 cards recommend the
+  sampled profile above and warn against greedy decoding for this family
+  (degeneration/repetition). The pinned seed keeps runs repeatable on one machine and
+  Ollama version instead.
+- **Context budget (measured 2026-07-17):** all 1,225 corpus chunks through the pinned
+  model's own tokenizer: min 13 / median 352 / max **4,717** tokens — the max is the
+  atomic 13,011-char UStG "Anlage 2" table (2.758 chars/token; Qwen's BPE is denser on
+  this corpus than bge-m3's XLM-R, which counted 3,784 for the same chunk). Budget:
+  8,192 `num_ctx` − 1,024 reserved for the answer = 7,168 prompt tokens; assemble
+  guards at **17,920 characters** = 7,168 × a 2.5 chars/token floor. The floor sits
+  below the 2.758 minimum measured on any chunk large enough to matter near the
+  boundary (tiny chunks reach ratios down to 1.85 but cannot approach the budget), so
+  a prompt that passes the guard fits the window. The worst realistic k=5 prompt
+  (Anlage 2 plus four median §§) ≈ 6.4 k tokens — fits; the pathological
+  five-largest-chunks case (7,847 tokens of context alone) trips the loud
+  `AssembleError` instead of being silently truncated. Token-exact budgeting with the
+  served model's tokenizer stays Backlog 7.
+- **Alternatives weighed:** `granite4:micro` (3B, Apache-2.0, German officially listed,
+  2.1 GB — the RAM-friendliest fallback, EuroEval 2.28 just behind); `qwen3:8b` (best
+  strict-open German, needs the 16 GB floor — recorded as the upgrade path, not
+  rejected); `qwen2.5:7b` (Apache-2.0, card-only German evidence, superseded by Qwen3);
+  `mistral:7b` (Apache-2.0 but no official multilingual/German claim and weak German
+  scores); Teuken-7B-instruct-commercial-v0.4 (Apache-2.0 — its research sibling is
+  not — but a 4k context too small for multi-§ prompts, not in the official Ollama
+  library, and clearly weaker EuroEval German); EuroLLM-9B (Apache-2.0, 4k native
+  context, not in the official library); SmolLM3-3B (Apache-2.0, weaker German,
+  thinking on by default, community-only Ollama uploads).
+- **Measured on this machine (8 cores, 5.7 GB RAM + 4 GB swap, CPU-only, 2026-07-17;
+  the five spot-check runs in the [generate contract](stages/generate.md#verification)):**
+  - **Serving memory:** `ollama ps` reports **3.9 GB** for qwen3:4b-instruct at
+    `num_ctx` 8192 — 2.5 GB weights plus the f16 KV cache and runtime overhead.
+  - **Throughput:** prefill **7–11 tok/s**, decode **2.0–3.5 tok/s**; per-question wall
+    time 2:17–12:48 for prompts of 970–2,874 tokens and answers of 71–1,024 tokens.
+    Streaming is what keeps those minutes legible. These numbers are swap-bound, not
+    representative of the 16 GB floor: during generation the machine's RAM was
+    effectively full with swap peaking at its 4 GB limit.
+  - **Query-time coexistence:** the `ask` process peaked at 1.4–2.0 GiB RSS (bge-m3
+    goes cold after embedding the one question and pages out while the LLM decodes);
+    Ollama held 3.9 GB; Postgres was idle. The working sets sum to ≈ 8–9.5 GiB — inside
+    the 16 GB floor with headroom, but only runnable here through swap, which is
+    exactly where the low tok/s comes from.
+  - **Offline caveat:** the pinned `make embed` batch size (32) OOM-crashed on this
+    machine on UStG's long-sequence batch; a reduced batch (4) completed the identical
+    artifacts in 1:08 h at 2.8 GiB peak RSS. The 16 GB-floor embed measurement remains
+    the 2026-07-14 entry (9.1 GiB peak at batch 32).
+- **Consequences:** Ollama is the second Compose service (image pinned, models in a
+  named volume, same log caps — completing the 2026-07-10 Docker decision); `num_ctx`
+  must be sent on every request — Ollama's CPU-only default context is 4,096 (verified
+  2026-07-17), which would otherwise truncate silently; answer quality stays anecdotal
+  until the evaluation harness (Backlog 1); the README quick start states the 2.5 GB
+  model download and the image pull.
 
 **Corpus licensing — gesetze-im-internet.de** (verified live 2026-07-12): only the
 normative law texts enter the corpus; footnotes and editorial apparatus stay out.

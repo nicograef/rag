@@ -30,12 +30,15 @@ embed:         ## Embed chunk records into vector JSONL under data/embeddings/
 load:          ## Load chunks + embeddings into Postgres/pgvector (needs `make db`)
 	uv run python -m rag.load
 
-# ── Verification (online spot-check, not the Phase 4 retrieve stage) ──
+# ── Online path (question answering) ──
 
-.PHONY: query
+.PHONY: query ask
 
 query:         ## Verify retrieval: make query Q="<question>" (top-k similarity search)
-	uv run python -m rag.query "$(Q)"
+	uv run python -m rag.retrieve "$(Q)"
+
+ask:           ## Ask a question: make ask Q="<question>" (retrieve → assemble → generate)
+	uv run python -m rag.ask "$(Q)"
 
 # ── Code Quality ──
 
@@ -69,6 +72,16 @@ db-shell:      ## Open psql shell in running PostgreSQL container
 
 down:          ## Stop all containers
 	docker compose down
+
+# ── LLM runtime (docker-compose.yml) ──
+
+.PHONY: llm llm-pull
+
+llm:           ## Start the Ollama LLM service (Docker Compose)
+	docker compose up -d ollama
+
+llm-pull:      ## Pull the pinned LLM into the Ollama model volume (needs `make llm`)
+	docker compose exec ollama ollama pull $$(uv run python -c "from rag.generate import MODEL_TAG; print(MODEL_TAG)")
 
 # ── Utilities ──
 

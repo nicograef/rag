@@ -1,4 +1,4 @@
-# Local dev stack — currently just the vector database.
+# Local dev stack — the vector database and the LLM runtime.
 # Copy .env.example to .env first.
 
 services:
@@ -26,5 +26,26 @@ services:
       timeout: 3s
       retries: 10
 
+  ollama:
+    image: ollama/ollama:0.32.1
+    restart: unless-stopped
+    # Same log cap as postgres — the json-file driver grows unbounded otherwise.
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      # The image ships no curl/wget; the ollama CLI round-trips through the server.
+      test: ["CMD", "ollama", "ls"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   pgdata:
+  ollama:
