@@ -26,7 +26,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from rag import CHUNKS_DIR, CORPUS_DIR
+from rag import CHUNKS_DIR, CORPUS_DIR, HEADING_SEPARATOR, run_per_law
 
 # Front matter fields the chunk stage consumes (the rest — title, builddate — are ignored).
 SLUG_KEY = "slug"
@@ -34,9 +34,6 @@ LAW_KEY = "abbreviation"
 SOURCE_URL_KEY = "source_url"
 FETCHED_AT_KEY = "fetched_at"
 REQUIRED_KEYS = (SLUG_KEY, LAW_KEY, SOURCE_URL_KEY, FETCHED_AT_KEY)
-
-# The separator convert puts between a norm unit's enbez and its optional titel.
-HEADING_SEPARATOR = " — "
 
 # Default size policy: a unit whose `text` exceeds this is split; whole units below the
 # merge floor are candidates to merge with same-section neighbours.
@@ -185,6 +182,10 @@ class SplitPart:
     ``overlap`` is the duplicated context repeated from the previous part (``""`` for the
     first part, the previous group's final Absatz for an Absatz-group part, or a trailing
     character window for a char-split part). ``text`` is what the chunk actually carries.
+
+    Only ``text`` reaches the emitted chunk — ``content``, ``joiner``, and ``overlap``
+    exist so the tests can machine-check the no-silent-loss and overlap contracts via
+    :func:`body_from_parts`.
     """
 
     text: str
@@ -556,16 +557,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no corpus in {args.corpus_dir} — run `make convert` first", file=sys.stderr)
         return 1
 
-    failed: list[str] = []
-    for corpus_file in corpus_files:
-        try:
-            output = chunk_law(corpus_file, args.chunks_dir)
-        except (ChunkError, OSError) as error:
-            print(f"✗ {corpus_file.stem}: {error}", file=sys.stderr)
-            failed.append(corpus_file.stem)
-        else:
-            print(f"✓ {corpus_file.stem} → {output}")
-    if failed:
-        print(f"chunk failed for: {', '.join(failed)}", file=sys.stderr)
-        return 1
-    return 0
+    jobs = [
+        (
+            corpus_file.stem,
+            lambda corpus_file=corpus_file: f"→ {chunk_law(corpus_file, args.chunks_dir)}",
+        )
+        for corpus_file in corpus_files
+    ]
+    return run_per_law("chunk", jobs, (ChunkError, OSError))

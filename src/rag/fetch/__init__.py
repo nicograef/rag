@@ -13,7 +13,6 @@ import argparse
 import io
 import json
 import shutil
-import sys
 import tempfile
 import tomllib
 import zipfile
@@ -22,7 +21,7 @@ from pathlib import Path
 
 import httpx
 
-from rag import RAW_DIR
+from rag import RAW_DIR, run_per_law
 
 DOWNLOAD_URL = "https://www.gesetze-im-internet.de/{slug}/xml.zip"
 TIMEOUT_SECONDS = 30.0
@@ -90,16 +89,8 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
 
 
 def _fetch_all(client: httpx.Client, laws: dict[str, str], raw_dir: Path) -> int:
-    failed: list[str] = []
-    for slug, label in laws.items():
-        try:
-            files = fetch_law(client, slug, raw_dir)
-        except (httpx.HTTPError, zipfile.BadZipFile) as error:
-            print(f"✗ {slug} ({label}): {error}", file=sys.stderr)
-            failed.append(slug)
-        else:
-            print(f"✓ {slug} ({label}): {', '.join(files)}")
-    if failed:
-        print(f"fetch failed for: {', '.join(failed)}", file=sys.stderr)
-        return 1
-    return 0
+    jobs = [
+        (f"{slug} ({label})", lambda slug=slug: f"→ {', '.join(fetch_law(client, slug, raw_dir))}")
+        for slug, label in laws.items()
+    ]
+    return run_per_law("fetch", jobs, (httpx.HTTPError, zipfile.BadZipFile))

@@ -22,7 +22,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from rag import CORPUS_DIR, RAW_DIR
+from rag import CORPUS_DIR, HEADING_SEPARATOR, RAW_DIR, run_per_law
 
 # Footnote references: their markers are dropped per the licensing decision.
 INLINE_IGNORED = {"FnR"}
@@ -171,7 +171,7 @@ def _render_norm(norm: etree._Element, section_depth: int) -> tuple[list[str], i
         raise ConversionError(f"heading depth {depth} exceeds H{MAX_HEADING_DEPTH} for {enbez!r}")
 
     titel = norm.find("metadaten/titel")
-    heading = enbez if titel is None else f"{enbez} — {_inline_text(titel)}"
+    heading = enbez if titel is None else f"{enbez}{HEADING_SEPARATOR}{_inline_text(titel)}"
     blocks = [f"{'#' * depth} {heading}"]
     content = norm.find("textdaten/text/Content")
     if content is not None:
@@ -202,7 +202,7 @@ def _render_section(norm: etree._Element) -> list[str]:
         raise ConversionError("section norm has no <gliederungsbez>")
     titel = ge.findtext("gliederungstitel")
     bez = _normalize(bez)
-    heading = bez if titel is None else f"{bez} — {_normalize(titel)}"
+    heading = bez if titel is None else f"{bez}{HEADING_SEPARATOR}{_normalize(titel)}"
 
     content = norm.find("textdaten/text/Content")
     if content is not None and _render_content(content, heading):
@@ -304,7 +304,10 @@ def _list_items(dl: etree._Element, context: str) -> Iterator[tuple[str, etree._
 
 
 def _render_list(dl: etree._Element, context: str) -> list[str]:
-    """A ``<DL>`` enumeration → plain-text lines, nested lists indented 4 spaces."""
+    """A ``<DL>`` enumeration → plain-text lines, nested lists indented 4 spaces.
+
+    :func:`_flatten_list` is this family's deliberate single-line twin for table cells.
+    """
     lines: list[str] = []
     for marker, dd in _list_items(dl, context):
         lines.extend(_render_item(dd, marker, context))
@@ -461,7 +464,11 @@ def _flatten_cell(entry: etree._Element, context: str) -> str:
 
 
 def _flatten_list(dl: etree._Element, context: str) -> list[str]:
-    """A ``<DL>`` inside a cell → ``marker text`` fragments (recursing into nested lists)."""
+    """A ``<DL>`` inside a cell → ``marker text`` fragments (recursing into nested lists).
+
+    Deliberately parallel to :func:`_render_list`: pipe-table cells cannot hold newlines,
+    so this family flattens to one line where the body family indents — keep them separate.
+    """
     fragments: list[str] = []
     for marker, dd in _list_items(dl, context):
         fragments.append(_normalize(f"{marker} {_flatten_dd(dd, context)}"))
@@ -526,16 +533,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no fetched laws in {args.raw_dir} — run `make fetch` first", file=sys.stderr)
         return 1
 
-    failed: list[str] = []
-    for law_dir in sorted(path for path in args.raw_dir.iterdir() if path.is_dir()):
-        try:
-            output = convert_law(law_dir, args.corpus_dir)
-        except (ConversionError, OSError, etree.LxmlError) as error:
-            print(f"✗ {law_dir.name}: {error}", file=sys.stderr)
-            failed.append(law_dir.name)
-        else:
-            print(f"✓ {law_dir.name} → {output}")
-    if failed:
-        print(f"convert failed for: {', '.join(failed)}", file=sys.stderr)
-        return 1
-    return 0
+    jobs = [
+        (law_dir.name, lambda law_dir=law_dir: f"→ {convert_law(law_dir, args.corpus_dir)}")
+        for law_dir in sorted(path for path in args.raw_dir.iterdir() if path.is_dir())
+    ]
+    return run_per_law("convert", jobs, (ConversionError, OSError, etree.LxmlError))
