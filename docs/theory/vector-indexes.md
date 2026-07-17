@@ -42,6 +42,17 @@ navigating ever finer; on the base layer it maintains a candidate list (size
 `hnsw.ef_search`, default 40) instead of a single point, and returns the best k. Search
 cost grows roughly logarithmically with corpus size.
 
+A sketch of one descent — a sparse upper layer over the dense base:
+
+```text
+                        · q           the query lands nearest (E)
+upper:   (A)────────►(D)              sparse layer: few nodes, long hops from entry (A)
+          │           │
+          ▼           ▼               descend one layer at the closest node
+base:    (A)─(B)─(C)─(D)─(E)─(F)      dense layer: every vector is a node
+                       └──►(E)        greedy hops to the query's nearest neighbor
+```
+
 The dial settings are explicit: bigger `m`/`ef_construction` (build-time candidate list,
 default 64) buy a better-connected graph — higher recall, more memory, slower builds;
 bigger `ef_search` buys recall per query at latency cost. The
@@ -51,6 +62,14 @@ is present to be *learned from* — measured tuning belongs to the evaluation ha
 deletes incrementally (no periodic retraining — fits the load stage's idempotent
 re-runs), and the graph lives in RAM to be fast — the index memory *is* the price of the
 speed.
+
+There is a build-order twist here. pgvector's own README recommends creating an HNSW index
+*after* loading the initial data — like any index, one bulk build over rows already present
+is faster than growing the graph insert by insert. The load stage does the opposite on
+purpose: a resident `CREATE INDEX IF NOT EXISTS` so every re-run is idempotent, paying the
+slower incremental build in exchange. At MVP scale (~1,225 rows) that build is seconds and
+the trade costs nothing; it is the knob to revisit if the corpus ever grows orders of
+magnitude.
 
 ## IVF: the clustering alternative (theory-only contrast)
 

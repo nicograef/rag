@@ -13,7 +13,7 @@ setup:         ## Install dependencies into .venv (uv sync)
 
 # ── Pipeline (offline ingestion) ──
 
-.PHONY: fetch convert chunk embed load query
+.PHONY: fetch convert chunk embed load
 
 fetch:         ## Download law XML from gesetze-im-internet.de into data/raw/
 	uv run python -m rag.fetch
@@ -29,6 +29,10 @@ embed:         ## Embed chunk records into vector JSONL under data/embeddings/
 
 load:          ## Load chunks + embeddings into Postgres/pgvector (needs `make db`)
 	uv run python -m rag.load
+
+# ── Verification (online spot-check, not the Phase 4 retrieve stage) ──
+
+.PHONY: query
 
 query:         ## Verify retrieval: make query Q="<question>" (top-k similarity search)
 	uv run python -m rag.query "$(Q)"

@@ -58,7 +58,7 @@ All commands via Makefile in the project root (`make help` for the full list).
 | ----------- | -------------------------------------------------------------- |
 | `src/rag/`  | Pipeline source (subpackages per stage as phases land)         |
 | `tests/`    | pytest suites                                                  |
-| `docs/`     | Roadmap, decisions, phase notes                                |
+| `docs/`     | Roadmap + decisions, concept map, theory chapters, stage contracts, PRDs, plans |
 | `scripts/`  | Bash scripts (dev tool setup)                                  |
 | `data/`     | Raw downloads, corpus, artifacts — **gitignored**, re-runnable |
 

@@ -74,7 +74,7 @@ in the same change.
 | Hybrid search | Running dense and sparse retrieval in parallel and merging results, so paraphrases and exact terms are both catchable. | Backlog 2. |
 | Reciprocal rank fusion (RRF) | Merging ranked lists by summing 1/(k + rank) per document — no score calibration between retrievers needed. | Backlog 2. |
 | Score normalization / weighted fusion | Merging results by normalizing incomparable raw scores to a common scale and combining as a weighted sum. | Theory — hybrid-search chapter (Backlog 2), as the alternative RRF deliberately sidesteps. |
-| Top-k results | Truncating a ranked list to the k highest-scoring chunks, trading recall against prompt size and noise. | Phase 4 — k is pinned as a dated decision when the phase lands. |
+| Top-k results | Truncating a ranked list to the k highest-scoring chunks, trading recall against prompt size and noise. | Phase 4 — k is pinned as a dated decision when the phase lands; a `k=5` default already ships in the dev query verification tool (`src/rag/query`), but the real pinning still waits for Phase 4. |
 | Metadata filtering | Restricting retrieval to chunks whose metadata matches structured conditions, applied before or after the vector search. | Backlog 3. |
 | Cross-encoder reranking | A second precision pass scoring each (query, candidate) pair jointly through one transformer forward pass. | Backlog 5. |
 | ColBERT / late interaction | Storing one embedding per token and scoring by token-level query-document interactions (MaxSim) — between bi-encoders and cross-encoders. | Theory — cross-encoders chapter (Backlog 5), as part of the retrieval-architecture spectrum. |

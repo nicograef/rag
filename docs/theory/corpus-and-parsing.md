@@ -65,7 +65,22 @@ have to guess is declared outright:
   anchor, handed over verbatim.
 
 So convert parses the XML directly and maps declared structure deterministically to
-Markdown. The transform is **lossless** and **deterministic** (same input files →
+Markdown. One norm maps straight through — `<enbez>` becomes the heading, each `<P>` a
+paragraph that keeps its own `(1)`-style marker:
+
+```xml
+<norm><metadaten><enbez>§ 3</enbez><titel format="XML">Steuern</titel></metadaten>
+  <textdaten><text format="XML"><Content>
+    <P>(1) Steuern sind Geldleistungen …</P></Content></text></textdaten></norm>
+```
+
+```markdown
+## § 3 — Steuern
+
+(1) Steuern sind Geldleistungen …
+```
+
+The transform is **lossless** and **deterministic** (same input files →
 byte-identical output, asserted by golden-file tests per the
 [convert contract](../stages/convert.md)). This is also why Phase 1 uses no
 document-parsing library: reaching for one here would add the very approximation the XML

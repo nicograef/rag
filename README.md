@@ -55,7 +55,7 @@ make convert                      # convert it into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
 make embed                        # embed the chunks (first run downloads the model, ~4.6 GB)
 make load                         # fill the chunks table + HNSW index in Postgres
-make query Q="Wie müssen elektronische Kassen gesichert werden?"   # verify retrieval
+make query Q="Wie müssen elektronische Kassen gesichert werden?"   # Phase-3 retrieval spot-check (Phase 4's retrieve stage supersedes it)
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
@@ -150,7 +150,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
 | `docs/stages/`       | Stage contracts: input/output artifacts, invocation, guarantees  |
 | `docs/theory/`       | Theory chapters: one building block each, landed with its phase  |
-| `docs/prds/`         | PRDs: product big picture (playbook) and per-phase feature PRDs  |
+| `docs/prds/`         | PRDs: the product big picture, plus a per-phase PRD where a phase warranted one (so far: embed & load) |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`), embeddings (`data/embeddings/`) — gitignored, re-runnable |

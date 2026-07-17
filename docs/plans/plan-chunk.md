@@ -3,6 +3,8 @@
 > Source PRD: [../prds/prd-rag-playbook.md](../prds/prd-rag-playbook.md) ·
 > Roadmap phase: [../roadmap.md](../roadmap.md) "Phase 2 — Structure-aware chunking"
 
+> **Completed (2026-07-12):** Phase 2 (structure-aware chunking) landed — kept as the historical implementation plan.
+
 ## Goal
 
 Land the **chunk** stage: split the Markdown corpus (`data/corpus/<slug>.md`, produced by

@@ -33,14 +33,23 @@ The producing models are transformer encoders. sentence-transformers wraps the r
 into one call, but the steps are worth seeing once:
 
 1. **Tokenize** — the text becomes subword tokens (the pinned model's XLM-RoBERTa
-   tokenizer covers 100+ languages, German included). Models have a token limit; a text
-   over it is silently truncated, which is why the model decision checked the Phase 2
-   chunk size against the limit (2000 chars ≈ 500–700 tokens vs an 8192-token window).
+   tokenizer covers 100+ languages, German included). Models have a token limit, and an
+   encoder left to itself silently truncates anything over it — which is why the model
+   decision checked the Phase 2 chunk size against the limit (2000 chars ≈ 500–700 tokens
+   vs an 8192-token window). Most chunks sit far under it, but chunking deliberately emits
+   one class above 2000 chars — the atomic oversized table (largest measured: UStG
+   „Anlage 2", 13,011 chars ≈ 3,784 tokens, still well inside 8192). So the
+   [embed stage](../stages/embed.md) does not lean on that margin: it enforces the window
+   in code — a chunk over the limit fails the law with an `EmbedError` naming it, never
+   silently cut.
 2. **Encode** — the transformer produces one contextual vector *per token*; the same word
    gets different vectors in different sentences.
-3. **Pool** — the per-token vectors are collapsed into one text-level vector, typically by
-   averaging (mean pooling). This is where "one chunk = one vector" comes from — and why
-   an over-stuffed chunk embeds to a blurred centroid of its topics.
+3. **Pool** — the per-token vectors are collapsed into one text-level vector: many models
+   average them (mean pooling); the pinned bge-m3 instead reads out its **CLS token**, the
+   position whose attention has already blended the whole text's meaning into one vector.
+   Either way the result is one fixed-length vector — which is where "one chunk = one
+   vector" comes from, and why an over-stuffed chunk dilutes: a longer text packs more
+   meaning into the same fixed width, so its vector lands close to no query in particular.
 4. **Normalize** — optionally scale the vector to unit length (next section).
 
 An encoder trained only to reconstruct language is not yet good at retrieval; embedding
@@ -70,6 +79,14 @@ as **one** decision: `BAAI/bge-m3`, normalized, cosine distance `<=>` — and th
 live next to each other in [`src/rag/embed/`](../../src/rag/embed/__init__.py) and
 [`src/rag/load/`](../../src/rag/load/__init__.py). Cosine distance is `1 − cosine
 similarity`: 0 means same direction, 1 means orthogonal — the numbers `make query` prints.
+
+A worked case on two unit vectors makes that identity concrete:
+
+```text
+a = (1.0, 0.0)   b = (0.6, 0.8)     # both unit length: 0.6² + 0.8² = 1
+a · b   = 1.0·0.6 + 0.0·0.8 = 0.6   # dot product = cosine similarity, since both are unit
+1 − 0.6 = 0.4                       # cosine distance — the number <=> returns
+```
 
 ## Dense vs sparse: what dense retrieval is bad at
 

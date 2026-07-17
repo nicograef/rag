@@ -2,6 +2,8 @@
 
 > Source PRD: [../prds/prd-rag-playbook.md](../prds/prd-rag-playbook.md)
 
+> **Completed (2026-07-11):** the documentation rework landed — kept as the historical plan.
+
 ## Goal
 
 Reposition the repository as a **RAG playbook** — a production-shaped, self-hosted,

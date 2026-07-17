@@ -3,6 +3,8 @@
 > Source PRD: [../prds/prd-rag-playbook.md](../prds/prd-rag-playbook.md) ·
 > Roadmap phase: [../roadmap.md](../roadmap.md) "Phase 1 — Fetch & convert"
 
+> **Completed (2026-07-12):** Phase 1 (fetch & convert) landed — kept as the historical implementation plan.
+
 ## Goal
 
 Land the **fetch** and **convert** stages: a config-driven fetcher that downloads official

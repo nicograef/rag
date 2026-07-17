@@ -14,9 +14,9 @@ whole system, fixed before a single vector exists. Two forces pull against each 
 the chunk size is where they are balanced.
 
 **Too big dilutes.** An embedding is one fixed-length vector per chunk (the *why* of that
-lands with the embed stage in Phase 3); it averages everything the chunk says into a single
-point. A chunk covering five unrelated Absätze embeds to their blurred
-centroid — close to no query in particular, so precise questions retrieve it weakly or not
+lands with the embed stage in Phase 3); it compresses everything the chunk says into a
+single point. A chunk covering five unrelated Absätze embeds to a point
+close to no query in particular, so precise questions retrieve it weakly or not
 at all. Oversized chunks also waste the generator's fixed token budget: a handful of them
 fills the prompt, crowding out other relevant §§, and the model reads a long context
 worst at its **middle** (the *lost in the middle* effect, its own concept — Backlog 7).
@@ -106,6 +106,20 @@ accounts for by reconstructing the original body from the parts *minus* the over
 character-splitting fallback, having no Absätze to repeat, falls back consistently to a
 fixed character-window overlap between its pieces — the same reasoning, one structural level
 down.
+
+A toy split makes the overlap concrete — a § whose two Absätze together overflow the size
+budget, cut into two parts:
+
+```text
+§ 5 Beispielnorm         both Absätze together exceed the toy budget, so the § splits by
+(1) Erster Absatz.       Absatz; each part re-leads with the § heading, and each part after
+(2) Zweiter Absatz.      the first repeats the previous part's final whole Absatz:
+
+  part 1                   part 2
+  § 5 Beispielnorm         § 5 Beispielnorm     ← heading repeated on both parts
+  (1) Erster Absatz.       (1) Erster Absatz.    ← repeated overlap (part 1's last Absatz)
+                           (2) Zweiter Absatz.
+```
 
 ## Deliberately deferred to Backlog 6
 
