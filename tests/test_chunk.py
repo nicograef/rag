@@ -301,3 +301,28 @@ def test_main_without_corpus_fails_with_a_hint(
 
     assert exit_code == 1
     assert "make convert" in capsys.readouterr().err
+
+
+# ── Guard tests: corpus Markdown the chunker cannot parse fails loudly ──
+
+
+def test_a_malformed_front_matter_line_raises() -> None:
+    # An unquoted value is not convert's `key: "value"` shape.
+    with pytest.raises(ChunkError, match="malformed front matter line"):
+        parse_front_matter(["---", "slug: somelaw", "---"])
+
+
+def test_a_dangling_backslash_in_a_front_matter_value_raises() -> None:
+    # A value ending in a lone backslash has nothing to escape — convert never writes this.
+    with pytest.raises(ChunkError, match="dangling backslash"):
+        parse_front_matter(["---", 'abbreviation: "bad\\"', "---"])
+
+
+def test_front_matter_without_a_closing_marker_raises() -> None:
+    with pytest.raises(ChunkError, match="missing front matter closing"):
+        parse_front_matter(["---", 'slug: "somelaw"'])
+
+
+def test_a_body_not_starting_with_an_h1_raises() -> None:
+    with pytest.raises(ChunkError, match="does not start with an H1"):
+        parse_norm_units(["## § 1", "", "Inhalt."])

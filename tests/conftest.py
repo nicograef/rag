@@ -69,19 +69,22 @@ def test_db(monkeypatch: pytest.MonkeyPatch):
         )
     except psycopg.OperationalError:
         pytest.skip("database unreachable — start it with `make db` (see .env.example)")
-    admin.execute(f"DROP DATABASE IF EXISTS {TEST_DB}")
-    admin.execute(f"CREATE DATABASE {TEST_DB}")
+    # `admin` outlives the yield, so no single `with` can scope it: the try/finally
+    # guarantees the close even when setup fails before the yield (which pytest's
+    # post-yield teardown never sees).
+    try:
+        admin.execute(f"DROP DATABASE IF EXISTS {TEST_DB}")
+        admin.execute(f"CREATE DATABASE {TEST_DB}")
 
-    monkeypatch.setenv("POSTGRES_HOST", settings["host"])
-    monkeypatch.setenv("POSTGRES_PORT", settings["port"])
-    monkeypatch.setenv("POSTGRES_USER", settings["user"])
-    monkeypatch.setenv("POSTGRES_PASSWORD", settings["password"])
-    monkeypatch.setenv("POSTGRES_DB", TEST_DB)
-    connection = psycopg.connect(
-        psycopg.conninfo.make_conninfo(**{**settings, "dbname": TEST_DB}), autocommit=True
-    )
-    yield connection
-
-    connection.close()
-    admin.execute(f"DROP DATABASE {TEST_DB} WITH (FORCE)")
-    admin.close()
+        monkeypatch.setenv("POSTGRES_HOST", settings["host"])
+        monkeypatch.setenv("POSTGRES_PORT", settings["port"])
+        monkeypatch.setenv("POSTGRES_USER", settings["user"])
+        monkeypatch.setenv("POSTGRES_PASSWORD", settings["password"])
+        monkeypatch.setenv("POSTGRES_DB", TEST_DB)
+        with psycopg.connect(
+            psycopg.conninfo.make_conninfo(**{**settings, "dbname": TEST_DB}), autocommit=True
+        ) as connection:
+            yield connection
+        admin.execute(f"DROP DATABASE {TEST_DB} WITH (FORCE)")
+    finally:
+        admin.close()
