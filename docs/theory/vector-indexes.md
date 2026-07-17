@@ -56,20 +56,20 @@ base:    (A)─(B)─(C)─(D)─(E)─(F)      dense layer: every vector is a n
 The dial settings are explicit: bigger `m`/`ef_construction` (build-time candidate list,
 default 64) buy a better-connected graph — higher recall, more memory, slower builds;
 bigger `ef_search` buys recall per query at latency cost. The
-[load stage](../stages/load.md) keeps pgvector's defaults: at MVP corpus scale the index
-is present to be *learned from* — measured tuning belongs to the evaluation harness
-(Backlog 1). Two operational properties matter even now: HNSW handles inserts and
-deletes incrementally (no periodic retraining — fits the load stage's idempotent
-re-runs), and the graph lives in RAM to be fast — the index memory *is* the price of the
-speed.
+[load stage](../stages/load.md) keeps pgvector's defaults (`m` 16, `ef_construction` 64):
+at MVP corpus scale the index is present to be *learned from* — measured tuning belongs to
+the evaluation harness (Backlog 1). Two operational properties matter even now: HNSW
+handles inserts and deletes incrementally (no periodic retraining — fits the load stage's
+idempotent re-runs), and the graph lives in RAM to be fast — the index memory *is* the
+price of the speed.
 
 There is a build-order twist here. pgvector's own README recommends creating an HNSW index
 *after* loading the initial data — like any index, one bulk build over rows already present
 is faster than growing the graph insert by insert. The load stage does the opposite on
 purpose: a resident `CREATE INDEX IF NOT EXISTS` so every re-run is idempotent, paying the
-slower incremental build in exchange. At MVP scale (~1,225 rows) that build is seconds and
-the trade costs nothing; it is the knob to revisit if the corpus ever grows orders of
-magnitude.
+slower incremental build in exchange. At this MVP corpus scale (a few thousand rows) that
+build is seconds and the trade costs nothing; it is the knob to revisit if the corpus ever
+grows orders of magnitude.
 
 ## IVF: the clustering alternative (theory-only contrast)
 
@@ -89,8 +89,8 @@ contrast that shows *why*.
 
 ## Vector quantization: paying for scale with precision (theory-only contrast)
 
-At real scale the vectors themselves become the problem: a million 1024-dim fp32 vectors
-are ~4 GB before any index structure. **Vector quantization** compresses the stored
+At real scale the vectors themselves become the problem: a million 384-dim fp32 vectors
+are ~1.5 GB before any index structure. **Vector quantization** compresses the stored
 vectors — **SQ** (scalar: each float → int8, ~4×), **PQ** (product: split the vector into
 subvectors, replace each with a codebook id, order-of-magnitude compression), **BQ**
 (binary: one bit per dimension, ~32×) — trading a controlled amount of recall for memory,
@@ -104,7 +104,7 @@ not a blind spot.
 
 An index answers exactly one question — *which stored vectors are nearest to this one?* A
 **vector database** is a datastore that persists vectors *alongside the text and metadata
-they belong to* and keeps them consistent: transactional writes (load's per-law replace
+they belong to* and keeps them consistent: transactional writes (load's per-article replace
 is one transaction), an upsert key, filtering on metadata in the same query (Backlog 3),
 joins, backups. That is why this pipeline's choice is Postgres + pgvector rather than a
 bare index library (FAISS et al.): the chunk row — text, citation metadata, provenance,
@@ -116,8 +116,13 @@ data, one boring Postgres is the production-shaped answer.
 
 ## Where this leaves the pipeline
 
-The [load stage](../stages/load.md) creates the `chunks` table and its HNSW index
-idempotently and fills both from the artifacts; `make query` demonstrates the search
-(`ORDER BY embedding <=> $q LIMIT k`) end to end. Phase 4's retrieve stage will run that
-same query for real questions — and the recall/latency dial stays untouched until the
+The [load stage](../stages/load.md) creates the `chunks` table — whose embedding column is a
+fixed-width `vector(384)` — and its HNSW index on `vector_cosine_ops` idempotently, then
+fills both from the artifacts; `make query` demonstrates the search
+(`ORDER BY embedding <=> $q LIMIT k`) end to end. That dimension is baked into the column at
+CREATE time, so `CREATE TABLE IF NOT EXISTS` will not migrate a table built for an earlier
+model to a new width. Rather than let the first insert fail with an opaque pgvector error,
+load checks the existing column and **refuses a stale-dimension table**, pointing at
+`make reset` to rebuild it. Phase 4's [retrieve stage](../stages/retrieve.md) runs that same
+similarity query for real questions — and the recall/latency dial stays untouched until the
 evaluation harness (Backlog 1) can measure what a turn of it actually does.

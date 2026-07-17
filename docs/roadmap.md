@@ -237,75 +237,59 @@ explicitly instead of implicitly.
   entries (CDC, chunk-level permissions, multimodal embeddings, human-feedback loops, …)
   are recorded with rationale so they are decisions, not omissions.
 
-**Embedding model — BAAI/bge-m3** (decided 2026-07-14): the model, embedding
-normalization, and pgvector distance operator, pinned together for Phase 3 and everything
-downstream.
+**Embedding model — BAAI/bge-small-en-v1.5** (decided 2026-07-17): the model, dimension,
+embedding normalization, and pgvector distance operator, pinned together for the embed stage
+and everything downstream.
 
-- **Context:** Phase 3 needs an open-license, multilingual, CPU-capable
-  sentence-transformers model; the choice fixes the vector dimension, normalization, and
-  distance operator for the store, and Phase 4 embeds questions with the same model.
-  Candidates per roadmap: the multilingual-e5 family, jina-embeddings-v2-base-de, bge-m3.
-  All facts below were verified live 2026-07-14 — primary reachable sources: the official
-  MTEB model metadata and results repos, microsoft/unilm (E5), FlagOpen/FlagEmbedding
-  (bge-m3); huggingface.co was unreachable from the implementing session (egress policy),
-  so model-card claims were corroborated via the MTEB metadata and search snippets.
-- **Choice:** **`BAAI/bge-m3`** — MIT license, 568 M parameters (≈ 2.2 GB fp32), dense
-  dimension **1024**, input limit **8192 tokens**, no query/passage prefixes. Vectors are
-  **normalized** (the model's own default; its README scores by inner product of normalized
-  vectors, i.e. cosine), so the pinned pgvector operator is **cosine distance `<=>`** with
-  an HNSW index on `vector_cosine_ops` (pgvector defaults `m=16`, `ef_construction=64` —
-  no reason to deviate at MVP corpus scale). The values live as constants in
-  [`src/rag/embed/`](../src/rag/embed/__init__.py) and [`src/rag/load/`](../src/rag/load/__init__.py).
-- **Why bge-m3:**
-  - **Chunk fit.** The Phase 2 chunk size (2000 chars ≈ 500–700 XLM-RoBERTa tokens for
-    German prose; the one atomic 13 k-char table ≈ 5 k tokens) fits 8192 tokens with 4–8×
-    headroom even at a conservative 2 chars/token — no chunk-stage change, no silent
-    truncation. The e5 family's 512-token cap would truncate the largest chunks or force a
-    token-measured re-chunk.
-  - **German retrieval, verified.** Best verified German score among the candidates:
-    MIRACL-de dense nDCG@10 **56.7** vs multilingual-e5-large 56.4, -base 52.1, -small 48.8
-    (bge-m3 paper Table 1 as corrected 2024-07-01, table image in the FlagEmbedding repo;
-    e5 numbers from the MTEB results repo).
-  - **One code path.** No `query:`/`passage:` prefixes ("no longer requires adding
-    instructions to the queries" — bge-m3 README), so ingest and question embedding share
-    one interface with nothing to get wrong between them.
-  - **Late chunking stays live.** bge-m3 is the only candidate exposing token-level
-    (ColBERT) vectors and sparse lexical weights from the same pass — the Backlog 6
-    late-chunking condition is met, and built-in hybrid scoring is a future option.
-- **Alternatives weighed:** `multilingual-e5-base` — the family's best size/quality ratio
-  (278 M, MIRACL-de 52.1) and strong GermanQuAD (nDCG@10 0.94), but the 512-token cap
-  conflicts with the Phase 2 chunk size and the required prefixes split the embedding code
-  path; `jina-embeddings-v2-base-de` — the right shape (8192 tokens, 161 M, Apache-2.0)
-  but its German benchmark numbers could not be verified from any reachable primary source
-  (absent from the MTEB results repo) — rejected as unverifiable, not as deficient;
-  `multilingual-e5-small/large` — same 512-token cap, small measurably weaker, large costs
-  as much as bge-m3 without its features. Sobering context: every e5 size collapses on the
-  legal-domain GerDaLIR benchmark (nDCG@10 0.065–0.157, and larger is not better) — dense
-  retrieval has a domain ceiling here, and the recorded answer is hybrid BM25 + RRF
-  (Backlog 2), not a bigger dense model.
-- **16 GB floor & measurements** (measured 2026-07-14 on a 4-core Intel Xeon @ 2.80 GHz,
-  16 GB RAM, CPU-only — a `make embed` run over the full four-law corpus, 1,225 chunks):
-  - **Throughput:** 17 min 26 s wall with the model cached — ≈ **1.2 chunks/s**; the first
-    run including the model download took 18 min 30 s.
-  - **Peak memory:** ≈ **9.1 GiB** peak RSS of the embed process (`/usr/bin/time -v`,
-    both runs within 1 %) — CPU batch inference over sequences up to 3,784 tokens, well
-    above the idle fp32 footprint. Fits the 16 GB floor with ≈ 6.5 GiB headroom, and the
-    peak is confined to offline ingestion: the online path embeds one short question at a
-    time, so it never coexists with Phase 4's ≈ 5 GB LLM at this level.
-  - **Download size:** the weights are 2.27 GB, but the first `make embed` filled
-    `~/.cache/huggingface/` with **≈ 4.6 GB** — sentence-transformers resolved
-    `pytorch_model.bin` (2.27 GB) and transformers additionally fetched the safetensors
-    conversion from its own snapshot (2.27 GB), so the weights land twice. The README
-    states the measured total.
-  - **Tokenizer check on real chunks:** all 1,225 chunk texts through the model's own
-    tokenizer (`XLMRobertaTokenizer`): min 11 / median 256 / max **3,784** tokens —
-    **zero chunks above the 8,192-token limit**. The max is the atomic 13,011-char
-    UStG "Anlage 2" table chunk (the entry's ≈ 5 k-token estimate above was
-    conservative); the Phase 2 chunk size is confirmed, no chunk-stage change needed.
-- **Consequences:** the `chunks.embedding` column is `vector(1024)`; question embedding in
-  Phase 4 must use the same pinned model; retrieval-quality claims stay anecdotal until the
-  evaluation harness (Backlog 1); the model download cost is stated in the README quick
-  start.
+- **Context:** the pipeline embeds English Wikipedia article sections and question text with
+  one open-license, CPU-capable sentence-transformers model, on the 4-core/8 GB floor. The
+  choice fixes the vector dimension, normalization, and distance operator for the store, and
+  the retrieve stage embeds questions with the same model. This supersedes the former
+  multilingual bge-m3 choice, which was sized for a German corpus and a 16 GB floor.
+- **Choice:** **`BAAI/bge-small-en-v1.5`** — MIT license, 33.4 M parameters, dense dimension
+  **384**, input limit **512 tokens**, English. Vectors are **L2-normalized**, so the pinned
+  pgvector operator is **cosine distance `<=>`** with an HNSW index on `vector_cosine_ops`
+  (pgvector defaults `m=16`, `ef_construction=64` — no reason to deviate at MVP corpus scale).
+  The model tag and batch size are env-overridable (`EMBED_MODEL_ID` / `EMBED_BATCH_SIZE`) with
+  the pinned value as the default. The values live as constants in
+  [`src/rag/embed/`](../src/rag/embed/__init__.py) and
+  [`src/rag/load/`](../src/rag/load/__init__.py).
+- **Why bge-small-en (facts verified live 2026-07-17 against the model card; the 384/512
+  properties re-confirmed at runtime with the loaded model):**
+  - **Fits the 8 GB floor.** A ≈ 130 MB download and a tiny CPU footprint — the swap-bound
+    memory pressure of bge-m3 (≈ 9 GiB peak RSS, over the 8 GB floor) is gone.
+  - **English, matched to the corpus.** The corpus is now English Wikipedia, so a strong
+    English-only model beats a multilingual one carried for a language the corpus no longer uses.
+  - **Symmetric path.** v1.5 makes the query instruction prefix optional, so the pipeline uses
+    **no instruction** for queries or passages — ingest and question embedding share one
+    interface. The query-only prefix (`"Represent this sentence for searching relevant
+    passages:"`, never on passages) is recorded as a documented recall-tuning lever, not the
+    default.
+  - **MIT-licensed**, satisfying the open-source-only rule with no attribution burden on the
+    weights.
+- **The 512-token consequence — chunk sizing is now load-bearing.** bge-m3's 8192-token
+  window left chunk size slack; bge-small-en's **512-token** cap does not. `max_chars` is
+  pinned to 1200 characters, validated with the model's own tokenizer over the fetched corpus
+  (densest ≈ 2.44 chars/token → ≤ ~492 tokens worst-case, observed max 375), and the embed
+  token-guard is the hard backstop (see the [chunk contract](stages/chunk.md)).
+- **8 GB-floor measurement (measured 2026-07-17, CPU-only, `make embed` over the 20-club
+  corpus, 1333 chunks):** the model download is **≈ 130 MB** (129 MiB in
+  `~/.cache/huggingface/`, a single snapshot — no double-fetch); the full embed run took
+  **≈ 3 min 49 s** wall (≈ 5.8 chunks/s) at batch 16, comfortably within the 8 GB floor
+  without swap. A `make query` spot-check returned plausible sections ranked by cosine
+  distance (e.g. "Which stadium does Arsenal play at?" → the `Arsenal F.C. — Stadiums` chunks
+  at distance ≈ 0.20).
+- **Accepted trade:** bge-small is far weaker than bge-m3 in absolute retrieval quality — a
+  deliberate trade for a model that fits 4-core/8 GB and reads to an English audience, not a
+  silent downgrade. Exact-match on club names and years still motivates hybrid BM25 + RRF
+  (Backlog 2).
+- **Late chunking no longer applies.** Unlike bge-m3, bge-small-en exposes no token-level
+  (ColBERT) vectors and caps at 512 tokens, so the Backlog 6 late-chunking precondition (a
+  long-context model with token embeddings) is **no longer met** — recorded in the concept map.
+- **Consequences:** the `chunks.embedding` column is `vector(384)`; a table left at an earlier
+  dimension is refused with a `make reset` hint (the load dimension guard); question embedding
+  in the retrieve stage uses the same pinned model; retrieval-quality claims stay anecdotal
+  until the evaluation harness (Backlog 1); the model download cost is stated in the README.
 
 **Generation model — qwen3:4b-instruct** (decided 2026-07-17): the LLM, its context
 length, decoding parameters, and the retrieval top-k, pinned together for Phase 4's

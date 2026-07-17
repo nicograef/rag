@@ -34,12 +34,13 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-> **Corpus pivot in progress (fetch → chunk verified 2026-07-17):** the **fetch**, **convert**,
-> and **chunk** stages now build and slice an **English Wikipedia** corpus (the 20 current
-> Premier League clubs, `clubs.toml`) — verified with `make fetch` → `make chunk` over all 20
-> articles (1,333 chunks, each within the embedding model's 512-token window). Embed & load and
-> the online path pivot in later slices, so the quick-start figures and corpus framing below
-> still describe the previous run until the wrap-up slice re-verifies the whole loop.
+> **Corpus pivot in progress (fetch → load verified 2026-07-17):** the offline pipeline —
+> **fetch**, **convert**, **chunk**, **embed** (`BAAI/bge-small-en-v1.5`, dim 384), and
+> **load** (`vector(384)`) — now builds an **English Wikipedia** corpus (the 20 current
+> Premier League clubs, `clubs.toml`): a full `make fetch` → `make load` run indexed 1,333
+> chunks, and `make query` returns plausible club sections by cosine distance. Only the
+> **online path** (assemble, generate) still runs on the previous stack, so the quick-start
+> figures and corpus framing below lag until the wrap-up slice re-verifies the whole loop.
 
 Quick start last verified from a clean checkout: **2026-07-14** — every step below as
 written: dev setup, `make db` including the image pull, `make check`, the full pipeline
@@ -86,10 +87,9 @@ pinned to the PyTorch CPU wheel index in `pyproject.toml`, which avoids the ~4 G
 CUDA libraries the default PyPI wheels bundle; the dev tools alone are ~65 MB), a
 one-time ~160 MB (compressed) pull of the
 `pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
-four-law MVP corpus, and a one-time **~4.6 GB download of the pinned embedding model**
-(`BAAI/bge-m3`) into `~/.cache/huggingface/` on the first `make embed` — the 2.27 GB
-weights land twice, as `pytorch_model.bin` plus the safetensors conversion (details in
-the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds** (measured
+four-law MVP corpus, and a one-time **~130 MB download of the pinned embedding model**
+(`BAAI/bge-small-en-v1.5`) into `~/.cache/huggingface/` on the first `make embed` (measured
+2026-07-17; details in the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds** (measured
 2026-07-17): a one-time pull of the pinned `ollama/ollama:0.32.1` image (≈ 8 GB on
 disk) and a one-time **~2.5 GB download of the pinned LLM** (`qwen3:4b-instruct`,
 4-bit GGUF) into the named Docker volume on the first `make llm-pull`.
@@ -174,7 +174,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
 | `docs/stages/`       | Stage contracts: input/output artifacts, invocation, guarantees  |
 | `docs/theory/`       | Theory chapters: one building block each, landed with its phase  |
-| `docs/prds/`         | PRDs: the product big picture, plus a per-phase PRD where a phase warranted one (so far: embed & load) |
+| `docs/prds/`         | PRDs: the product big picture, plus the English-Wikipedia-pivot PRD |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`), embeddings (`data/embeddings/`) — gitignored, re-runnable |

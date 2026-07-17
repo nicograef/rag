@@ -17,21 +17,25 @@ Theory: docs/theory/embeddings.md
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Protocol
 
 from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_source
 
-# Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
-# model, normalization, and pgvector distance operator are chosen together — the reasoning
-# lives in the decision entry, the values live here.
-MODEL_ID = "BAAI/bge-m3"
-EMBEDDING_DIM = 1024
+# Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-17):
+# model, dimension, normalization, and the pgvector distance operator are chosen together — the
+# reasoning lives in the decision entry, the values live here. The model tag and batch size are
+# env-overridable with the pinned value as the default (the "pinned choice, tunable knob" rule).
+MODEL_ID = os.environ.get("EMBED_MODEL_ID", "BAAI/bge-small-en-v1.5")
+EMBEDDING_DIM = 384
 NORMALIZE_EMBEDDINGS = True
 
-# CPU batch size: large enough to amortize per-batch overhead, small enough to keep memory flat.
-BATCH_SIZE = 32
+# CPU batch size, kept modest to fit the 4-core/8 GB floor; override with EMBED_BATCH_SIZE.
+# bge-small-en-v1.5 uses a symmetric path — no query/passage instruction prefix — so ingest
+# and question embeddings share one interface.
+BATCH_SIZE = int(os.environ.get("EMBED_BATCH_SIZE", "16"))
 
 
 class EmbedError(Exception):

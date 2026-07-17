@@ -259,6 +259,25 @@ def test_a_wrong_dimension_artifact_is_rejected(
 
 
 @pytest.mark.integration
+def test_a_stale_dimension_table_is_rejected_with_a_reset_hint(
+    test_db: psycopg.Connection, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A chunks table left at a different embedding dimension is not migrated by
+    # CREATE ... IF NOT EXISTS; load must refuse with a `make reset` hint before the first
+    # insert, not fail on an opaque pgvector error.
+    stale_dim = EMBEDDING_DIM + 100
+    test_db.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    test_db.execute(f"CREATE TABLE chunks (id text PRIMARY KEY, embedding vector({stale_dim}))")
+    chunks_dir, embeddings_dir, _ = _write_artifacts(tmp_path)
+
+    assert _run_load(chunks_dir, embeddings_dir) == 1
+
+    err = capsys.readouterr().err
+    assert "make reset" in err
+    assert f"vector({stale_dim})" in err
+
+
+@pytest.mark.integration
 def test_section_path_and_part_round_trip_through_the_database(
     test_db: psycopg.Connection, tmp_path: Path
 ) -> None:

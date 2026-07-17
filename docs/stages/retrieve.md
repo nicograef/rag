@@ -16,15 +16,15 @@ into this stage; the standalone CLI here keeps its output shape so `make query` 
 Three ways in, one code path:
 
 ```sh
-make query Q="Wie müssen elektronische Kassen gesichert werden?"   # wraps:
-uv run python -m rag.retrieve "<question>"                        # options: --top-k 5
+make query Q="Which stadium does Arsenal play at?"   # wraps:
+uv run python -m rag.retrieve "<question>"            # options: --top-k 5
 ```
 
 ```python
 from rag.embed import SentenceTransformerEmbedder
 from rag.retrieve import retrieve
 
-hits = retrieve("Wann entsteht die Umsatzsteuer?", embedder=SentenceTransformerEmbedder())
+hits = retrieve("Which stadium does Arsenal play at?", embedder=SentenceTransformerEmbedder())
 ```
 
 - **`retrieve(question, *, embedder, top_k=TOP_K) -> list[RetrievedChunk]`** — the library
@@ -40,22 +40,25 @@ hits = retrieve("Wann entsteht die Umsatzsteuer?", embedder=SentenceTransformerE
 The question **must** be embedded with the same model that embedded the corpus — nearest-
 neighbour search is only meaningful when query and documents live in one vector space. That
 model, its normalization, and the pgvector distance operator are one decision (the
-[embedding-model decision](../roadmap.md#decisions), `BAAI/bge-m3`, cosine); the distance
-operator is read from `rag.load.DISTANCE_OPERATOR`, never re-spelled here. The
-[embeddings chapter](../theory/embeddings.md) explains why the spaces must match.
+[embedding-model decision](../roadmap.md#decisions), `BAAI/bge-small-en-v1.5`, cosine); the
+distance operator is read from `rag.load.DISTANCE_OPERATOR`, never re-spelled here.
+Dimension 384 flows from `rag.embed.EMBEDDING_DIM`; the retrieval logic itself is unchanged
+by the model's dimension. The [embeddings chapter](../theory/embeddings.md) explains why the
+spaces must match.
 
 ## Input
 
 - **The question** — one string, embedded to a query vector.
 - **The `chunks` table** — the store the [load stage](load.md) owns. The query consumes six
-  columns: `id`, `law`, `citation`, `source_url`, `text`, and `embedding` (for the distance).
-  Connection settings come from the environment (`POSTGRES_*`, see [`.env.example`](../../.env.example)) —
-  the same mechanism load uses, via `rag.load.connection_conninfo()`.
+  columns: `id`, `source_title`, `citation`, `source_url`, `text`, and `embedding` (for the
+  distance). Connection settings come from the environment (`POSTGRES_*`, see
+  [`.env.example`](../../.env.example)) — the same mechanism load uses, via
+  `rag.load.connection_conninfo()`.
 
 The single query orders by the pinned distance operator and truncates to `top_k`:
 
 ```sql
-SELECT id, law, citation, source_url, text, embedding <=> :question AS distance
+SELECT id, source_title, citation, source_url, text, embedding <=> :question AS distance
 FROM chunks ORDER BY distance LIMIT :top_k;
 ```
 
@@ -67,14 +70,14 @@ The HNSW index the load stage built serves this `ORDER BY` — the ANN search th
 A list of `RetrievedChunk`, ascending by `distance` (nearest first) — the **downstream
 contract** the assemble and ask stages consume:
 
-| Field        | Type    | Value                                                        |
-| ------------ | ------- | ------------------------------------------------------------ |
-| `id`         | string  | The chunk id (its identity in the store)                     |
-| `law`        | string  | The law the chunk belongs to (e.g. `UStG`)                   |
-| `citation`   | string  | Human-readable § reference (e.g. `§ 13 UStG`) — shown in sources |
-| `source_url` | string  | The chunk's source URL — cited alongside the answer          |
-| `text`       | string  | The normative text — what the generator reads                |
-| `distance`   | float   | Cosine distance to the question (lower is nearer)            |
+| Field          | Type    | Value                                                        |
+| -------------- | ------- | ------------------------------------------------------------ |
+| `id`           | string  | The chunk id (its identity in the store)                     |
+| `source_title` | string  | The article the chunk belongs to (e.g. `Arsenal F.C.`)       |
+| `citation`     | string  | Human-readable label (e.g. `Arsenal F.C. — Stadiums`) — shown in sources |
+| `source_url`   | string  | The chunk's source URL — cited alongside the answer          |
+| `text`         | string  | The chunk's text — what the generator reads                  |
+| `distance`     | float   | Cosine distance to the question (lower is nearer)             |
 
 ## Top-k
 
@@ -89,8 +92,8 @@ The CLI prints one hit per rank to stdout, two lines each — rank, cosine dista
 then an indented one-line snippet of the text (whitespace-flattened, truncated to 200 chars):
 
 ```
-1. (0.4013) § 146a AO
-   (1) Wer aufzeichnungspflichtige Geschäftsvorfälle … mit einem elektronischen …
+1. (0.2013) Arsenal F.C. — Stadiums
+   Arsenal's home ground is the Emirates Stadium in Holloway, north London …
 ```
 
 The library `retrieve()` returns the full records; snippetting is a CLI-only affordance.
@@ -110,6 +113,13 @@ message carries the actionable hint:
 The connection settings are checked before the question is embedded — and in the CLIs even
 before the embedding model is constructed — so a misconfigured store fails in milliseconds
 instead of after the model load.
+
+## Verification
+
+**Spot-check (2026-07-17):** `make query Q="Which stadium does Arsenal play at?"` against a
+store loaded from the 20-club corpus ranked the `Arsenal F.C. — Stadiums` chunks first, at
+cosine distance ≈ 0.20 — see [load](load.md#verification) for the full pipeline re-run this
+was checked against.
 
 ## Downstream consumers
 

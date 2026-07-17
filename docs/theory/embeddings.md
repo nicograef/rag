@@ -13,9 +13,9 @@ high-dimensional space, built so that semantically similar texts lie close toget
 single property is the whole trick: once "similar meaning" has been turned into "small
 distance", the fuzzy problem *find text that means roughly this* becomes the mechanical
 problem *find the nearest vectors* — something a database can index and search. Retrieval
-by meaning is called **semantic search**, and it needs no keyword overlap: „Kasse muss
-manipulationssicher sein" can land near § 146a AO even though the § never uses those
-words, because the model maps both to nearby points.
+by meaning is called **semantic search**, and it needs no keyword overlap: "which London
+club plays at the Emirates Stadium" can land near the Arsenal article even though the
+article never phrases the question that way, because the model maps both to nearby points.
 
 Everything downstream inherits this geometry. The chunk was the unit of retrieval
 ([chunking chapter](chunking.md)); the embedding decides *where that unit lives* in
@@ -25,27 +25,28 @@ space.
 ## Dense embeddings, and how a sentence-transformers model produces one
 
 The vectors this pipeline stores are **dense embeddings**: comparatively compact
-(1024 dimensions here), with every dimension carrying some learned value. No dimension
+(384 dimensions here), with every dimension carrying some learned value. No dimension
 means anything by itself — the *directions* in the space, learned from data, encode
-concepts.
+concepts. The width is itself a knob: fewer dimensions are cheaper to store and faster to
+search than the wider vectors a larger model emits, bought at some representational cost.
+384 sits at the small end of that trade, chosen together with the model.
 
 The producing models are transformer encoders. sentence-transformers wraps the recipe
 into one call, but the steps are worth seeing once:
 
-1. **Tokenize** — the text becomes subword tokens (the pinned model's XLM-RoBERTa
-   tokenizer covers 100+ languages, German included). Models have a token limit, and an
-   encoder left to itself silently truncates anything over it — which is why the model
-   decision checked the Phase 2 chunk size against the limit (2000 chars ≈ 500–700 tokens
-   vs an 8192-token window). Most chunks sit far under it, but chunking deliberately emits
-   one class above 2000 chars — the atomic oversized table (largest measured: UStG
-   „Anlage 2", 13,011 chars ≈ 3,784 tokens, still well inside 8192). So the
-   [embed stage](../stages/embed.md) does not lean on that margin: it enforces the window
-   in code — a chunk over the limit fails the law with an `EmbedError` naming it, never
-   silently cut.
+1. **Tokenize** — the text becomes subword tokens. The pinned model's tokenizer is
+   **English-only** (the pipeline's earlier multilingual model's was not) — a fit, not a
+   regression, now that the corpus is English Wikipedia. Models have a token limit, and an
+   encoder left to itself silently truncates anything over it. This model's window is
+   **512 tokens** — tight enough that chunk size is load-bearing rather than slack, which is
+   why the [chunking chapter](chunking.md#characters-versus-tokens) pins the character cap
+   by measuring real text through this very tokenizer. The [embed stage](../stages/embed.md)
+   leans on no margin: a chunk over the window fails the article with an `EmbedError` naming
+   it, never silently cut.
 2. **Encode** — the transformer produces one contextual vector *per token*; the same word
    gets different vectors in different sentences.
 3. **Pool** — the per-token vectors are collapsed into one text-level vector: many models
-   average them (mean pooling); the pinned bge-m3 instead reads out its **CLS token**, the
+   average them (mean pooling); the pinned model instead reads out its **CLS token**, the
    position whose attention has already blended the whole text's meaning into one vector.
    Either way the result is one fixed-length vector — which is where "one chunk = one
    vector" comes from, and why an over-stuffed chunk dilutes: a longer text packs more
@@ -57,9 +58,23 @@ models are additionally trained with **contrastive objectives** — pull (query,
 passage) pairs together, push unrelated pairs apart — which is what makes question
 vectors land near answer-passage vectors. It is also why the question must be embedded
 with the **same model** as the corpus: two different models produce two unrelated
-geometries, and distances between them are meaningless. The pipeline pins one model for
-both sides — chosen, with measurements and alternatives, in the dated
+geometries, and distances between them are meaningless. This **query-document coupling** is
+the property the [retrieve stage](../stages/retrieve.md) depends on — it pins one model for
+both sides, chosen with measurements and alternatives in the dated
 [embedding-model decision](../roadmap.md#decisions).
+
+## Symmetric or asymmetric: one interface for query and passage
+
+Some embedding models are trained **asymmetrically**: they expect a short instruction
+prefixed to the query but not to the passages, so a question and a document are encoded
+through slightly different front doors. The pinned model makes that prefix **optional**, and
+the pipeline takes the offer: it prepends **no instruction** to either side, so ingesting a
+chunk and embedding a question run through exactly one interface — the very query-document
+coupling above, now free rather than worked around. The documented query-only prefix
+(`"Represent this sentence for searching relevant passages:"`) stays on the shelf as a
+**recall-tuning lever** to reach for if evaluation ever shows it helps — a knob, not the
+default. The choice lives with the model constant in
+[`src/rag/embed/`](../../src/rag/embed/__init__.py).
 
 ## Normalization and the distance operator: one decision, not two
 
@@ -75,8 +90,8 @@ pair: the model card says whether its training assumed normalized vectors, and t
 distance operator must match. Pinning them separately invites the quiet failure mode
 where ingestion normalizes and search assumes it didn't. The
 [model decision](../roadmap.md#decisions) therefore pins model + normalization + operator
-as **one** decision: `BAAI/bge-m3`, normalized, cosine distance `<=>` — and the constants
-live next to each other in [`src/rag/embed/`](../../src/rag/embed/__init__.py) and
+as **one** decision: `BAAI/bge-small-en-v1.5`, normalized, cosine distance `<=>` — and the
+constants live next to each other in [`src/rag/embed/`](../../src/rag/embed/__init__.py) and
 [`src/rag/load/`](../../src/rag/load/__init__.py). Cosine distance is `1 − cosine
 similarity`: 0 means same direction, 1 means orthogonal — the numbers `make query` prints.
 
@@ -93,17 +108,23 @@ a · b   = 1.0·0.6 + 0.0·0.8 = 0.6   # dot product = cosine similarity, since 
 The mirror image of dense is the **sparse embedding**: a vocabulary-sized, mostly-zero
 vector that weights explicit terms — classically BM25's term statistics, or a learned
 expansion (SPLADE). Sparse retrieval is literal: it excels exactly where dense retrieval
-is weakest — exact identifiers, rare terms, „§ 146a" as a string — and fails where dense
-shines (paraphrase, synonymy, cross-lingual drift). The benchmark numbers in the model
-decision make the trade concrete: strong dense models score high on question-answer
-retrieval yet collapse on the legal-domain GerDaLIR task, and a bigger dense model does
-not fix it. The recorded answer is not a better vector but **both**: dense + BM25-style
-sparse retrieval fused with RRF — Backlog 2, with its own chapter when it lands.
+is weakest — exact identifiers, rare terms, a proper noun such as the stadium name
+"Highbury" as an exact string — and fails where dense shines (paraphrase, synonymy, the
+query that shares no words with the answer). The recorded response to that trade is not a
+better vector but **both**: dense + BM25-style sparse retrieval fused with RRF — Backlog 2,
+with its own chapter when it lands.
+
+The honest caveat belongs here too. This pipeline pins a **small English** model that fits
+the 4-core/8 GB floor and reads to an English audience; a full-size multilingual embedding
+model would retrieve markedly better in absolute quality. That gap is a deliberate,
+recorded trade — the reasoning and the benchmark evidence live in the
+[embedding-model decision](../roadmap.md#decisions), not hidden here — and one more reason
+the sparse half of Backlog 2 matters.
 
 ## Where this leaves the pipeline
 
 The [embed stage](../stages/embed.md) maps each chunk record to one normalized
-1024-float vector and writes them as inspectable JSON lines; the
+384-float vector and writes them as inspectable JSON lines; the
 [load stage](../stages/load.md) stores them next to the chunk's text and metadata and
 indexes them for nearest-neighbor search — how a database searches millions of vectors
 without comparing against every one is the [vector-indexes chapter](vector-indexes.md).

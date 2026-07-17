@@ -22,13 +22,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_format_hit_shows_rank_distance_citation_and_snippet() -> None:
-    line = format_hit(1, 0.1234567, "§ 1 KassenSichV", "Erster Satz.\n\nZweiter Satz.")
+    line = format_hit(1, 0.1234567, "Arsenal F.C. — History", "First sentence.\n\nSecond sentence.")
 
-    assert line == "1. (0.1235) § 1 KassenSichV\n   Erster Satz. Zweiter Satz."
+    assert line == "1. (0.1235) Arsenal F.C. — History\n   First sentence. Second sentence."
 
 
 def test_format_hit_truncates_a_long_text_to_a_snippet() -> None:
-    line = format_hit(2, 0.5, "§ 2 SomeLaw", "Wort " * 100)
+    line = format_hit(2, 0.5, "Club F.C. — Stadium", "word " * 100)
 
     snippet = line.split("\n   ")[1]
     assert len(snippet) == 200
@@ -41,7 +41,7 @@ def test_main_without_connection_settings_fails_with_a_hint(
     for name in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
         monkeypatch.delenv(name, raising=False)
 
-    exit_code = main(["Wie funktioniert das?"], embedder=FakeEmbedder())
+    exit_code = main(["How does it work?"], embedder=FakeEmbedder())
 
     assert exit_code == 1
     assert ".env.example" in capsys.readouterr().err
@@ -58,7 +58,7 @@ def test_main_checks_settings_before_constructing_the_real_embedder(
         lambda: pytest.fail("the real embedder must not be constructed"),
     )
 
-    exit_code = main(["frage"])  # no injected embedder — the real CLI path
+    exit_code = main(["a question"])  # no injected embedder — the real CLI path
 
     assert exit_code == 1
     assert ".env.example" in capsys.readouterr().err
@@ -68,7 +68,7 @@ def test_a_non_positive_top_k_is_rejected_at_parsing(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit):
-        main(["Wie funktioniert das?", "--top-k", "0"], embedder=FakeEmbedder())
+        main(["How does it work?", "--top-k", "0"], embedder=FakeEmbedder())
 
     assert "--top-k must be at least 1" in capsys.readouterr().err
 
@@ -83,17 +83,17 @@ def test_main_with_an_unreachable_database_fails_with_a_hint(
     monkeypatch.setenv("POSTGRES_PASSWORD", "rag")
     monkeypatch.setenv("POSTGRES_DB", "rag")
 
-    exit_code = main(["frage"], embedder=FakeEmbedder())
+    exit_code = main(["a question"], embedder=FakeEmbedder())
 
     assert exit_code == 1
     assert "make db" in capsys.readouterr().err
 
 
-def _load_kassensichv(test_db: psycopg.Connection, tmp_path: Path) -> None:
-    """Load the KassenSichV fixture into the throwaway database with fake embeddings."""
+def _load_citypark(test_db: psycopg.Connection, tmp_path: Path) -> None:
+    """Load the citypark fixture into the throwaway database with fake embeddings."""
     chunks_dir = tmp_path / "chunks"
     chunks_dir.mkdir()
-    source = FIXTURES / "chunks" / "kassensichv.jsonl"
+    source = FIXTURES / "chunks" / "citypark.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
     embeddings_dir = tmp_path / "embeddings"
     embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
@@ -108,9 +108,9 @@ def test_retrieve_returns_ranked_records_and_main_prints_them(
 ) -> None:
     # Query with a known chunk's exact text: the fake embedder is deterministic, so that
     # chunk is its own nearest neighbor (distance 0) — the ranking is checkable end to end.
-    _load_kassensichv(test_db, tmp_path)
+    _load_citypark(test_db, tmp_path)
     target = json.loads(
-        (FIXTURES / "chunks" / "kassensichv.jsonl").read_text(encoding="utf-8").splitlines()[1]
+        (FIXTURES / "chunks" / "citypark.jsonl").read_text(encoding="utf-8").splitlines()[1]
     )
     capsys.readouterr()  # drop the load output
 
@@ -144,7 +144,7 @@ def test_retrieve_without_a_loaded_table_reports_the_missing_table(
     test_db.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
     with pytest.raises(RetrieveError, match="no chunks table"):
-        retrieve("frage", embedder=FakeEmbedder(dim=EMBEDDING_DIM))
+        retrieve("a question", embedder=FakeEmbedder(dim=EMBEDDING_DIM))
 
 
 @pytest.mark.integration
@@ -154,7 +154,7 @@ def test_retrieve_on_a_fresh_database_reports_the_missing_table(
     # A database load never touched has no vector type either — registration itself fails,
     # and the user gets the same hint instead of a raw ProgrammingError.
     with pytest.raises(RetrieveError, match="no chunks table"):
-        retrieve("frage", embedder=FakeEmbedder(dim=EMBEDDING_DIM))
+        retrieve("a question", embedder=FakeEmbedder(dim=EMBEDDING_DIM))
 
 
 @pytest.mark.integration
@@ -162,4 +162,4 @@ def test_retrieve_from_an_empty_table_reports_it_empty(test_db: psycopg.Connecti
     test_db.execute(SCHEMA_SQL)  # schema and index in place, but no rows loaded
 
     with pytest.raises(RetrieveError, match="empty"):
-        retrieve("frage", embedder=FakeEmbedder(dim=EMBEDDING_DIM))
+        retrieve("a question", embedder=FakeEmbedder(dim=EMBEDDING_DIM))

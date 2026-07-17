@@ -1,6 +1,7 @@
 # Plan: Roadmap Phase 3 — Embed & load (vector store)
 
-> Source PRD: [../prds/prd-embed-load.md](../prds/prd-embed-load.md) ·
+> Source PRD: [../prds/prd-rag-playbook.md](../prds/prd-rag-playbook.md) (the per-phase
+> embed-load PRD was removed in the English-Wikipedia pivot) ·
 > Roadmap phase: [../roadmap.md](../roadmap.md) "Phase 3 — Embed & load (vector store)"
 
 > **Completed (2026-07-14):** all five slices landed, and the verification items the
@@ -178,9 +179,9 @@ Clarified with the maintainer during the PRD round:
 
 - `docs/roadmap.md — "Decisions"` — the dated decision-block format to follow; the entry
   lands under it.
-- `docs/prds/prd-embed-load.md — "Model selection"` — criteria: open license, German
-  retrieval quality, dimension count, CPU latency, memory fit; candidates: multilingual-e5
-  family, jina-embeddings-de, bge-m3.
+- Model-selection criteria (originally in the since-removed per-phase PRD; now folded into
+  the roadmap's [embedding-model decision](../roadmap.md#decisions)) — open license,
+  retrieval quality, dimension count, CPU latency, memory fit.
 - `pyproject.toml` — gains `sentence-transformers` so the measurements run against the real
   library.
 - `docs/plans/plan-chunk.md — "Open questions / Risks"` — the announced chunk-size

@@ -19,7 +19,7 @@ REFERENCE_COUNT = 3
 def main() -> None:
     from rag.embed import MODEL_ID, SentenceTransformerEmbedder
 
-    chunk_lines = (FIXTURES / "chunks" / "kassensichv.jsonl").read_text(encoding="utf-8")
+    chunk_lines = (FIXTURES / "chunks" / "citypark.jsonl").read_text(encoding="utf-8")
     texts = [json.loads(line)["text"] for line in chunk_lines.splitlines()[:REFERENCE_COUNT]]
 
     embedder = SentenceTransformerEmbedder()

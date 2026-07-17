@@ -33,7 +33,7 @@ from psycopg.types.json import Jsonb
 from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_source
 from rag.embed import EMBEDDING_DIM
 
-# Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
+# Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-17):
 # cosine distance, matching the model card's similarity function. The HNSW index uses
 # pgvector's default build parameters (m=16, ef_construction=64) — the MVP corpus is far
 # too small to need tuning.
@@ -217,6 +217,28 @@ def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None
         )
 
 
+def _check_schema_dimension(connection: psycopg.Connection) -> None:
+    """Fail with a `make reset` hint when the existing chunks.embedding column dim differs.
+
+    The dimension is baked into the vector column at CREATE time, so a table built for an
+    earlier model (e.g. ``vector(1024)``) is not migrated by ``CREATE ... IF NOT EXISTS`` —
+    inserting this build's ``vector(EMBEDDING_DIM)`` rows would otherwise fail on the first
+    insert with an opaque pgvector error instead of an actionable one.
+    """
+    row = connection.execute(
+        """
+        SELECT a.atttypmod, format_type(a.atttypid, a.atttypmod)
+        FROM pg_attribute a
+        WHERE a.attrelid = 'chunks'::regclass AND a.attname = 'embedding'
+        """
+    ).fetchone()
+    if row is not None and row[0] != EMBEDDING_DIM:
+        raise LoadError(
+            f"the chunks.embedding column is {row[1]}, but this build embeds at dimension "
+            f"{EMBEDDING_DIM} — run `make reset` to rebuild the table"
+        )
+
+
 def _load_law_files(
     connection: psycopg.Connection, chunks_dir: Path, embeddings_dir: Path, slug: str
 ) -> str:
@@ -267,6 +289,11 @@ def main(argv: list[str] | None = None) -> int:
         with psycopg.connect(conninfo, autocommit=True) as connection:
             connection.execute(SCHEMA_SQL)
             register_vector(connection)
+            try:
+                _check_schema_dimension(connection)
+            except LoadError as error:
+                print(str(error), file=sys.stderr)
+                return 1
 
             slugs = sorted({f.stem for f in chunks_files} | {f.stem for f in embeddings_files})
             jobs = [

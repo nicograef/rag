@@ -48,7 +48,7 @@ in the same change.
 | Structure-aware / element-based chunking | Splitting a document along its own structural elements (sections, headings, paragraphs, tables, lists) instead of at arbitrary positions. | [Phase 2](theory/chunking.md) — the phase itself: chunk by §, split by Absatz, heading-path metadata. |
 | Code-aware chunking | Splitting source code along syntactic units (functions, classes) derived from the AST rather than by lines. | Glossary — the code-corpus analogue of structure-aware chunking; this playbook has no code corpus. |
 | Contextual enrichment | Prepending document-level context (heading path or an LLM-generated situating summary) to each chunk before embedding, so it is retrievable in isolation. | Backlog 6 — Phase 2's metadata fields are the raw material. |
-| Late chunking | Embedding a long window with a long-context model first, then pooling token embeddings into per-chunk vectors that retain whole-document context. | Backlog 6 — the condition is met: the Phase 3 model (bge-m3) exposes token embeddings and an 8192-token context (see the model decision). |
+| Late chunking | Embedding a long window with a long-context model first, then pooling token embeddings into per-chunk vectors that retain whole-document context. | Backlog 6 — the condition is **no longer met**: the embed model (bge-small-en-v1.5) exposes no token-level embeddings and caps at 512 tokens (see the model decision). |
 
 ## Vectorization & storage
 
