@@ -12,6 +12,7 @@ from rag.chunk import (
     _split_body,
     body_from_parts,
     chunk_law,
+    main,
     parse_front_matter,
     parse_norm_units,
 )
@@ -279,8 +280,6 @@ def test_front_matter_missing_a_consumed_key_raises(tmp_path: Path) -> None:
 def test_main_isolates_a_failing_law_from_the_others(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from rag.chunk import main
-
     corpus_dir = tmp_path / "corpus"
     corpus_dir.mkdir()
     (corpus_dir / "good.md").write_text(FRONT_MATTER + "\n## § 1\n\nInhalt.\n", encoding="utf-8")
@@ -298,8 +297,6 @@ def test_main_isolates_a_failing_law_from_the_others(
 def test_main_without_corpus_fails_with_a_hint(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from rag.chunk import main
-
     exit_code = main(["--corpus-dir", str(tmp_path / "missing"), "--chunks-dir", str(tmp_path)])
 
     assert exit_code == 1

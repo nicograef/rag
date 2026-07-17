@@ -17,10 +17,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "lxml-stubs>=0.5.1",
-  "pytest>=8",
-  "ruff>=0.9",
-  "ty>=0.0.59",
+    "lxml-stubs>=0.5.1",
+    "pytest>=8",
+    "ruff>=0.9",
+    "ty>=0.0.59",
 ]
 
 # CPU-only torch: the playbook is CPU-only by design; the default PyPI wheels bundle

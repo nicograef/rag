@@ -1,19 +1,17 @@
 # Local dev stack — currently just the vector database.
 # Copy .env.example to .env first.
 
-# Cap container logs — the json-file driver grows unbounded otherwise and can
-# fill the server disk over time.
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "5m"
-    max-file: "3"
-
 services:
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
-    logging: *default-logging
+    # Cap container logs — the json-file driver grows unbounded otherwise and can
+    # fill the server disk over time.
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

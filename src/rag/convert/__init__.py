@@ -313,7 +313,7 @@ def _render_list(dl: etree._Element, context: str) -> list[str]:
 
 def _list_marker(dt: etree._Element, context: str) -> str:
     """A ``<DT>`` marker: its inline text, verbatim (markers are free-form source)."""
-    if len(dt) and any(child.tag not in INLINE_IGNORED for child in dt):
+    if any(child.tag not in INLINE_IGNORED for child in dt):
         raise ConversionError(f"unsupported child in <DT> of {context!r}")
     return _inline_text(dt)
 

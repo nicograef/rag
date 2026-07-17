@@ -54,7 +54,7 @@ make fetch                        # download the law XML (~0.4 MB) into data/raw
 make convert                      # convert it into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
 make embed                        # embed the chunks (first run downloads the model, ~4.6 GB)
-make load                        # fill the chunks table + HNSW index in Postgres
+make load                         # fill the chunks table + HNSW index in Postgres
 make query Q="Wie müssen elektronische Kassen gesichert werden?"   # verify retrieval
 ```
 
