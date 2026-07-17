@@ -69,13 +69,17 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
         embedder = SentenceTransformerEmbedder()
     embedding = embedder.embed([args.question])[0]
 
-    with psycopg.connect(conninfo) as connection:
-        register_vector(connection)
-        try:
-            hits = search(connection, embedding, args.top_k)
-        except psycopg.errors.UndefinedTable:
-            print("no chunks table — run `make load` first", file=sys.stderr)
-            return 1
+    try:
+        with psycopg.connect(conninfo) as connection:
+            register_vector(connection)
+            try:
+                hits = search(connection, embedding, args.top_k)
+            except psycopg.errors.UndefinedTable:
+                print("no chunks table — run `make load` first", file=sys.stderr)
+                return 1
+    except psycopg.OperationalError as error:
+        print(f"database connection failed: {error} — run `make db` first", file=sys.stderr)
+        return 1
 
     if not hits:
         print("the chunks table is empty — run `make load` first", file=sys.stderr)

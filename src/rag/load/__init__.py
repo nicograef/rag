@@ -3,11 +3,14 @@
 Reads each law's chunk records from ``data/chunks/<slug>.jsonl`` and its embedding records
 from ``data/embeddings/<slug>.jsonl`` (produced by the chunk and embed stages), joins them
 by chunk ``id``, and writes the ``chunks`` table this stage owns: text, metadata, and a
-fixed-dimension vector column with one HNSW index. Every run recreates the schema
-idempotently and applies per-law replace semantics — upsert every row by ``id``, then
-delete the law's rows whose ids are gone — so the store always mirrors the current
-artifacts. A chunk without a vector, a vector without a chunk, or model/dimension
-disagreement across records is a per-law error; nothing partial is written for that law.
+fixed-dimension vector column with one HNSW index. Every run ensures the schema exists
+(``CREATE ... IF NOT EXISTS``) and applies per-law replace semantics — upsert every row by
+``id``, then delete the law's rows whose ids are gone — so each law present in the input
+mirrors its current artifacts. The mirror is per-law only: a law whose artifact files are
+removed entirely is never visited, so its rows stay until the table is rebuilt. A chunk
+without a vector, a vector without a chunk, a record ``slug`` that contradicts the file
+name, or model/dimension disagreement across records is a per-law error; nothing partial
+is written for that law.
 
 Stage contract: docs/stages/load.md
 Theory: docs/theory/vector-indexes.md
@@ -19,6 +22,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import psycopg
 import psycopg.conninfo
@@ -26,7 +30,7 @@ from pgvector import Vector
 from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
 
-from rag import CHUNKS_DIR, EMBEDDINGS_DIR
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_law
 from rag.embed import EMBEDDING_DIM
 
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
@@ -77,9 +81,9 @@ class Row:
     embedding: list[float]
 
 
-def read_records(jsonl_file: Path) -> list[dict]:
+def read_records(jsonl_file: Path) -> list[dict[str, Any]]:
     """The JSON records of one artifact file, in file order."""
-    records = []
+    records: list[dict[str, Any]] = []
     for number, line in enumerate(jsonl_file.read_text(encoding="utf-8").splitlines(), start=1):
         try:
             record = json.loads(line)
@@ -93,14 +97,21 @@ def read_records(jsonl_file: Path) -> list[dict]:
     return records
 
 
-def join_law(chunk_records: list[dict], embedding_records: list[dict], dim: int) -> list[Row]:
+def join_law(
+    slug: str,
+    chunk_records: list[dict[str, Any]],
+    embedding_records: list[dict[str, Any]],
+    dim: int,
+) -> list[Row]:
     """Join one law's chunk and embedding records by ``id`` into table rows, validating both.
 
     Raises ``LoadError`` — before anything could be written — when a chunk has no vector, a
-    vector has no chunk, the embedding records disagree on one model and dimension, or that
-    dimension does not match the ``dim`` the schema's vector column is fixed to.
+    vector has no chunk, a chunk record's ``slug`` contradicts the artifact file's ``slug``
+    (the prune keys on it), the embedding records disagree on one model and dimension, or
+    that dimension does not match the ``dim`` the schema's vector column is fixed to.
     """
     try:
+        slugs = {record["slug"] for record in chunk_records}
         models = {record["model"] for record in embedding_records}
         dims = {record["dim"] for record in embedding_records}
         vectors = {record["id"]: record["embedding"] for record in embedding_records}
@@ -108,10 +119,14 @@ def join_law(chunk_records: list[dict], embedding_records: list[dict], dim: int)
     except KeyError as error:
         raise LoadError(f"record missing field {error}") from error
 
+    if wrong := sorted(slugs - {slug}):
+        raise LoadError(f"chunk record slug(s) {', '.join(wrong)} do not match the file {slug!r}")
     if len(models) > 1 or len(dims) > 1:
         raise LoadError(f"embedding records disagree on model/dim: {models}/{dims}")
     if dims and dims != {dim}:
-        raise LoadError(f"embedding dim {dims.pop()} does not match the schema's vector({dim})")
+        raise LoadError(
+            f"embedding dim {next(iter(dims))} does not match the schema's vector({dim})"
+        )
     if missing := [chunk_id for chunk_id in chunk_ids if chunk_id not in vectors]:
         raise LoadError(f"chunk(s) without an embedding: {', '.join(missing)}")
     if orphans := sorted(set(vectors) - set(chunk_ids)):
@@ -164,8 +179,8 @@ def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None
     """Write one law's rows with replace semantics, atomically.
 
     Upserts every row by ``id``, then deletes the law's rows whose ids are absent from the
-    current artifacts — the store mirrors the pipeline output and never accumulates stale
-    rows. Runs in one transaction: a mid-law failure leaves the law's previous state intact.
+    current artifacts — the law's rows mirror the pipeline output and never go stale. Runs
+    in one transaction: a mid-law failure leaves the law's previous state intact.
     """
     with connection.transaction(), connection.cursor() as cursor:
         cursor.executemany(
@@ -202,6 +217,21 @@ def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None
         )
 
 
+def _load_law_files(
+    connection: psycopg.Connection, chunks_dir: Path, embeddings_dir: Path, slug: str
+) -> str:
+    """One law's job: require both artifacts, join them, write; returns the ``✓`` detail."""
+    chunks_file = chunks_dir / f"{slug}.jsonl"
+    embeddings_file = embeddings_dir / f"{slug}.jsonl"
+    if not chunks_file.is_file():
+        raise LoadError("embeddings without chunk records — run `make chunk`")
+    if not embeddings_file.is_file():
+        raise LoadError("chunk records without embeddings — run `make embed`")
+    rows = join_law(slug, read_records(chunks_file), read_records(embeddings_file), EMBEDDING_DIM)
+    load_law(connection, slug, rows)
+    return f"→ chunks table ({len(rows)} rows)"
+
+
 def main(argv: list[str] | None = None) -> int:
     """Load every law's artifacts into Postgres; returns a non-zero exit code if any failed."""
     parser = argparse.ArgumentParser(
@@ -233,30 +263,22 @@ def main(argv: list[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 1
 
-    with psycopg.connect(conninfo, autocommit=True) as connection:
-        connection.execute(SCHEMA_SQL)
-        register_vector(connection)
+    try:
+        with psycopg.connect(conninfo, autocommit=True) as connection:
+            connection.execute(SCHEMA_SQL)
+            register_vector(connection)
 
-        failed: list[str] = []
-        slugs = sorted({f.stem for f in chunks_files} | {f.stem for f in embeddings_files})
-        for slug in slugs:
-            try:
-                chunks_file = args.chunks_dir / f"{slug}.jsonl"
-                embeddings_file = args.embeddings_dir / f"{slug}.jsonl"
-                if not chunks_file.is_file():
-                    raise LoadError("embeddings without chunk records — run `make chunk`")
-                if not embeddings_file.is_file():
-                    raise LoadError("chunk records without embeddings — run `make embed`")
-                rows = join_law(
-                    read_records(chunks_file), read_records(embeddings_file), EMBEDDING_DIM
+            slugs = sorted({f.stem for f in chunks_files} | {f.stem for f in embeddings_files})
+            jobs = [
+                (
+                    slug,
+                    lambda slug=slug: _load_law_files(
+                        connection, args.chunks_dir, args.embeddings_dir, slug
+                    ),
                 )
-                load_law(connection, slug, rows)
-            except (LoadError, OSError) as error:
-                print(f"✗ {slug}: {error}", file=sys.stderr)
-                failed.append(slug)
-            else:
-                print(f"✓ {slug} → chunks table ({len(rows)} rows)")
-    if failed:
-        print(f"load failed for: {', '.join(failed)}", file=sys.stderr)
+                for slug in slugs
+            ]
+            return run_per_law("load", jobs, (LoadError, OSError))
+    except psycopg.OperationalError as error:
+        print(f"database connection failed: {error} — run `make db` first", file=sys.stderr)
         return 1
-    return 0

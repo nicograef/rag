@@ -55,6 +55,22 @@ def test_a_non_positive_top_k_is_rejected_at_parsing(
     assert "--top-k must be at least 1" in capsys.readouterr().err
 
 
+def test_main_with_an_unreachable_database_fails_with_a_hint(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Not an integration test: the connection to port 1 is refused, so it never needs a DB.
+    monkeypatch.setenv("POSTGRES_HOST", "localhost")
+    monkeypatch.setenv("POSTGRES_PORT", "1")  # nothing listens here — connect refuses at once
+    monkeypatch.setenv("POSTGRES_USER", "rag")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "rag")
+    monkeypatch.setenv("POSTGRES_DB", "rag")
+
+    exit_code = main(["frage"], embedder=FakeEmbedder())
+
+    assert exit_code == 1
+    assert "make db" in capsys.readouterr().err
+
+
 @pytest.mark.integration
 def test_query_prints_ranked_hits_from_the_store(
     test_db: psycopg.Connection, tmp_path: Path, capsys: pytest.CaptureFixture[str]

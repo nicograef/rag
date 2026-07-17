@@ -7,7 +7,8 @@
 Fills Postgres/pgvector with the pipeline's output: chunk records joined with their
 embedding vectors. Fifth and last stage of the offline ingestion pipeline — it owns
 everything database-shaped (schema, index, writes), so no other stage touches the store's
-shape. After a run, the store mirrors the artifacts on disk exactly.
+shape. After a run, every law present in the input mirrors its artifacts on disk exactly;
+the mirror is deliberately per-law (see [replace semantics](#replace-semantics-idempotency)).
 
 ## Invocation
 
@@ -32,7 +33,8 @@ Per law (`<slug>`), both artifacts, joined by chunk `id`:
   the vector.
 
 The join is validated per law **before anything is written**: a chunk without a vector, a
-vector without a chunk, embedding records that disagree on one model and dimension, or a
+vector without a chunk, a chunk record whose `slug` contradicts the artifact file's name
+(the prune keys on it), embedding records that disagree on one model and dimension, or a
 dimension that does not match the schema's vector column all fail the law with no partial
 write.
 
@@ -69,9 +71,12 @@ Per law, in one transaction:
 2. **Prune** the law's stale rows (`DELETE ... WHERE slug = <slug> AND id NOT IN
    (current ids)`) — a chunk removed upstream disappears from the store.
 
-The store therefore always mirrors the current artifacts and never accumulates stale rows.
-A full reprocess on corpus change is the accepted model at MVP scale; incremental
-ingestion is Backlog 13.
+The store therefore mirrors the current artifacts law by law and never accumulates stale
+rows *within* a law. The mirror is deliberately per-law, not global: a law whose artifact
+files are removed entirely is never visited, so its rows stay until the table is rebuilt —
+the alternative, a global prune of every slug not in the input, would silently wipe the
+rest of the store on a run against a partial `--chunks-dir`. A full reprocess on corpus
+change is the accepted model at MVP scale; incremental ingestion is Backlog 13.
 
 ## Failure behaviour
 
@@ -80,7 +85,9 @@ reported on stderr (`✗ <slug>: <error>`), its transaction rolls back, and the 
 laws still load; the exit code is non-zero if any law failed. A law present in only one of
 the two input directories is an error for that law. When `--chunks-dir` is missing or
 empty the stage exits non-zero with a hint to run `make chunk` first; when
-`--embeddings-dir` is missing or empty, with a hint to run `make embed` first.
+`--embeddings-dir` is missing or empty, with a hint to run `make embed` first; when the
+database is unreachable, with a hint to run `make db` first (the same hint the query
+command prints).
 
 ## Verification
 
