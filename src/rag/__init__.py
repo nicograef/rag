@@ -1,9 +1,8 @@
-"""RAG over German law texts — pipeline package.
+"""RAG over an English Wikipedia corpus — pipeline package.
 
-Offline ingestion stages land as subpackages one roadmap phase at a time
-(fetch → convert → chunk → embed → load); the online path (retrieve →
-assemble → generate) follows, with evaluation as a cross-cutting harness.
-See docs/roadmap.md.
+Offline ingestion stages (fetch → convert → chunk → embed → load) build the store;
+the online path (retrieve → assemble → generate) answers questions, with evaluation
+as a cross-cutting harness. See docs/roadmap.md.
 """
 
 import sys

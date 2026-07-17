@@ -1,5 +1,9 @@
 # PRD: English Wikipedia Pivot — Lightweight Demo on Ordinary Hardware
 
+> **Status: landed 2026-07-18.** All six pivot phases are on `main`; the target-state docs
+> (README, roadmap, stage contracts, theory chapters) now carry the story. This PRD is kept
+> as the record of the migration's rationale, verified facts, and accepted risks.
+
 Repoints the playbook from German federal law to an **English Wikipedia corpus (current
 Premier League football clubs)** and swaps the two heavy models for **CPU-light** ones,
 lowering the design floor from 8-core/16 GB to **4-core/8 GB**. The execution plan (phase

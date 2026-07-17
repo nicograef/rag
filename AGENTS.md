@@ -5,8 +5,8 @@
 
 A **learning project that doubles as a public RAG playbook — in that order**: a
 production-shaped, self-hosted, framework-free reference implementation of
-Retrieval-Augmented Generation (RAG) over German federal law texts, built from first
-principles. Offline ingestion pipeline in Python — **fetch → convert → chunk → embed →
+Retrieval-Augmented Generation (RAG) over an English Wikipedia corpus (the 20 current
+Premier League football clubs), built from first principles. Offline ingestion pipeline in Python — **fetch → convert → chunk → embed →
 load** into Postgres/pgvector; online path — **retrieve → assemble → generate** with a
 local open-weight LLM via Ollama; **evaluate** is a cross-cutting harness, not a stage.
 The developer (Nico) is a senior fullstack engineer (TypeScript, React, Node, Go, Postgres,
@@ -24,12 +24,12 @@ phased plan and all recorded decisions;
 | ---------- | ----------------------------------------------------------------- |
 | Pipeline   | Python 3.12, uv (venv + lockfile), ruff, pytest                   |
 | Database   | PostgreSQL 17 + pgvector (Docker Compose)                         |
-| Embeddings | sentence-transformers, CPU-only — `BAAI/bge-m3` (pinned 2026-07-14) |
-| LLM        | Ollama serving `qwen3:4b-instruct` GGUF (CPU) — pinned 2026-07-17 |
-| Corpus     | German federal law XML from gesetze-im-internet.de → Markdown     |
+| Embeddings | sentence-transformers, CPU-only — `BAAI/bge-small-en-v1.5`, dim 384 (pinned 2026-07-17) |
+| LLM        | Ollama serving `granite4:micro` GGUF (CPU) — pinned 2026-07-18    |
+| Corpus     | English Wikipedia (20 Premier League clubs), CC BY-SA 4.0 → Markdown |
 | Future app | Go backend, React frontend (not started — pipeline first)         |
 
-Target runtime for everything: an 8-core / 16 GB **CPU-only** Linux VM.
+Target runtime for everything: a 4-core / 8 GB **CPU-only** machine (no GPU).
 
 ## Commands
 
@@ -38,8 +38,8 @@ All commands via Makefile in the project root (`make help` for the full list).
 | Command         | Description                                    |
 | --------------- | ---------------------------------------------- |
 | `make setup`    | Install dependencies (`uv sync`)               |
-| `make fetch`    | Download law XML from gesetze-im-internet.de into `data/raw/` |
-| `make convert`  | Convert fetched law XML into Markdown under `data/corpus/` |
+| `make fetch`    | Download Wikipedia article extracts into `data/raw/`          |
+| `make convert`  | Convert fetched article extracts into Markdown under `data/corpus/` |
 | `make chunk`    | Chunk the Markdown corpus into JSONL under `data/chunks/` |
 | `make embed`    | Embed chunk records into vector JSONL under `data/embeddings/` |
 | `make load`     | Load chunks + embeddings into Postgres/pgvector (needs `make db`) |
@@ -77,8 +77,8 @@ All commands via Makefile in the project root (`make help` for the full list).
 ## Code Style
 
 ```python
-def chunk_document(text: str, max_chars: int = 2000) -> list[Chunk]:
-    """Split a document into structure-aware chunks, one § at a time."""
+def chunk_document(text: str, max_chars: int = 1200) -> list[Chunk]:
+    """Split a document into structure-aware chunks, one section at a time."""
     ...
 ```
 
@@ -88,9 +88,11 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 ## Rules
 
 1. **Open-source only** — tools, libraries, models. No proprietary APIs, no cloud services.
-2. **CPU-only** — everything must run on the 8-core/16 GB VM without a GPU.
+2. **CPU-only** — everything must run on the 4-core/8 GB machine without a GPU.
 3. **Only public-domain or properly licensed sources enter the corpus/database.**
-   Law texts from gesetze-im-internet.de are amtliche Werke (§ 5 UrhG) — public domain.
+   English Wikipedia article text is CC BY-SA 4.0 (verified 2026-07-17) — properly licensed,
+   used under attribution: the corpus is gitignored and fetched at runtime (no copyleft
+   attaches to the repo), and displayed excerpts carry the article link plus a licence notice.
 4. **Python for all pipeline code.** Go/React are reserved for the future web app.
 5. **One feature at a time** — follow [docs/roadmap.md](docs/roadmap.md) phase by phase;
    never skip ahead or bundle phases. **Definition of done** for every future roadmap
@@ -100,8 +102,8 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
    from plain libraries — the goal is learning how RAG works internally.
 7. **No data artifacts in git.** `data/` is gitignored; every pipeline stage must be
    re-runnable from a clean checkout.
-8. **English** for docs, code, comments, and commits. German only for the corpus itself
-   and domain terms (law names, § references).
+8. **English** for docs, code, comments, commits, and the corpus itself (English Wikipedia).
+   Domain terms follow the source — club and competition names as Wikipedia spells them.
 
 ## Learning
 

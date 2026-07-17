@@ -1,6 +1,8 @@
 # Plan: English Wikipedia Pivot — lightweight demo on ordinary hardware
 
 > Source PRD: [../prds/prd-english-pivot.md](../prds/prd-english-pivot.md)
+>
+> **Status: landed 2026-07-18** — all six phases committed to `main`; kept as the migration record.
 
 ## Goal
 

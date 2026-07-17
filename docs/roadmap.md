@@ -17,34 +17,45 @@ devcontainer, CI, handbook conventions (AGENTS.md/CLAUDE.md, plugin adoption).
 
 Stages: **fetch**, **convert**
 
-Goal: a config-driven fetcher that turns official law XML into clean Markdown on disk.
+Goal: a config-driven fetcher that turns English Wikipedia article extracts into clean
+Markdown on disk.
 
-- Download official XML from gesetze-im-internet.de per law
-  (`https://www.gesetze-im-internet.de/<slug>/xml.zip`). These texts are amtliche Werke
-  (§ 5 UrhG) — public domain.
-- MVP corpus (config-driven, extensible): `ao_1977` (AO), `ustg_1980` (UStG),
-  `kassensichv` (KassenSichV), `gg` (GG).
-- Parse the `gii-norm` XML and emit one Markdown file per law under `data/corpus/`,
-  preserving structure: law → Buch/Abschnitt → § → Absatz, plus a metadata header
-  (law abbreviation, full title, fetch date, source URL).
-- No Docling here: the official XML is already structured — parsing it ourselves is
+- Download each article's plain-text extract from the English Wikipedia **MediaWiki
+  Action API** (TextExtracts: `action=query&prop=extracts|info&explaintext=1&exsectionformat=wiki`,
+  `https://en.wikipedia.org/w/api.php`) — no key, no OAuth, one request per article with a
+  descriptive User-Agent and `maxlag=5`. This text is CC BY-SA 4.0, not public domain — see
+  the corpus-licensing decision below.
+- MVP corpus (config-driven, extensible via [`clubs.toml`](../clubs.toml)): the 20 current
+  Premier League clubs' English Wikipedia articles, keyed by a filesystem-safe slug
+  (`arsenal`, `chelsea`, …) mapped to the exact article title.
+- Convert each article's extract plus its provenance record into one Markdown file under
+  `data/corpus/`, preserving structure: article → `==section==`/`===subsection===` wiki
+  headings translated to ATX (`##`/`###`), lead paragraphs promoted to an `##
+  Introduction` section, plus a front-matter header (slug, source title, source URL, fetch
+  date). Non-prose apparatus sections (References, External links, See also, …) are
+  dropped so only article prose reaches chunking.
+- No Docling here: the API extract is already clean plain text — parsing it ourselves is
   lossless and teaches real document parsing. Docling enters later for messy PDFs
   (see backlog).
-- Verify: re-runnable from clean checkout; deterministic output; unit tests on the
-  XML → Markdown converter with a small fixture.
+- Verify: re-runnable from clean checkout (fetch is idempotent, not deterministic —
+  Wikipedia is a living corpus; convert is deterministic); unit tests on the extract →
+  Markdown converter with a small fixture.
 
 ## Phase 2 — Structure-aware chunking ✅
 
 Stage: **chunk**
 
-Goal: split the Markdown corpus into retrieval units without destroying legal structure.
+Goal: split the Markdown corpus into retrieval units without destroying article structure.
 
-- Chunk by **§ (Paragraph)** as the natural semantic unit; split oversized §§ by Absatz
-  with overlap; merge tiny ones.
-- Each chunk carries **metadata**: law, § number, heading path (Buch/Abschnitt), source
-  URL, fetch date — the basis for later filtering and citations.
+- Chunk by **Wikipedia section** (a `##` heading and everything under it, including its
+  `###` subsections) as the natural semantic unit; split an oversized section into ordered
+  parts — subsection groups with overlap, and a recursive-character fallback for a single
+  overlong paragraph; merge consecutive tiny sections into one chunk.
+- Each chunk carries **metadata**: `source_title`, `unit` (the section name), `section_path`,
+  a human-readable `citation`, source URL, fetch date — the basis for later filtering and
+  citations.
 - Learn here: why chunk size matters, recursive character splitting as the baseline,
-  and why structure-aware beats fixed-size for law texts.
+  and why structure-aware beats fixed-size for Wikipedia's section structure.
 - Later candidates: see backlog item 6 (advanced chunking strategies).
 
 ## Phase 3 — Embed & load (vector store) ✅
@@ -53,36 +64,39 @@ Stages: **embed**, **load**
 
 Goal: embeddings for every chunk, stored and indexed in Postgres.
 
-- Research and pick an **open-license, multilingual, CPU-capable** embedding model from
-  Hugging Face via sentence-transformers (candidates to evaluate: multilingual-e5 family,
-  jina-embeddings-de, bge-m3 — decide by German retrieval quality, dimension count, and
-  CPU latency; verify against current model cards, not memory).
-- Schema: `chunks` table (text, metadata columns, `vector` column); **HNSW index**
-  (speed/recall trade-off — learn how it works). The theory chapter frames HNSW within
-  approximate nearest neighbor search and contrasts IVF and vector quantization (both
-  theory-only — see the [concept map](concepts.md)).
+- Research and pick an **open-license, English, CPU-capable** embedding model from Hugging
+  Face via sentence-transformers — decide by English retrieval quality, dimension count,
+  and CPU latency; verify against current model cards, not memory (landed:
+  `BAAI/bge-small-en-v1.5`, dense dimension 384 — see the dated decision below).
+- Schema: `chunks` table (text, metadata columns, `vector(384)` column); **HNSW index**
+  (speed/recall trade-off — learn how it works), cosine distance matching the model's
+  normalized embeddings. The theory chapter frames HNSW within approximate nearest neighbor
+  search and contrasts IVF and vector quantization (both theory-only — see the
+  [concept map](concepts.md)).
 - The dated model decision pins **embedding normalization** and the pgvector distance
   operator together with the model choice (verified against the model card).
 - Batch loader: idempotent re-runs (upsert by chunk identity), embedding in batches on CPU.
-- Verify: `SELECT ... ORDER BY embedding <=> query` returns plausible §§ for hand-written
-  test queries.
+- Verify: `SELECT ... ORDER BY embedding <=> query` returns plausible sections for
+  hand-written test queries.
 
 ## Phase 4 — Online PoC (CLI question answering) ✅
 
 Stages: **retrieve**, **assemble**, **generate**
 
-Goal: close the loop — ask a legal question in the terminal, get a grounded answer.
+Goal: close the loop — ask an English question about a football club in the terminal, get
+a grounded answer.
 
-- Runtime: **Ollama** (localhost HTTP API) serving an open-weight GGUF model that fits
-  8-core/16 GB CPU (candidate size: 7–8B quantized; pick during the phase). Runs as a
-  second Compose service next to Postgres, models in a named volume (see Docker decision
-  below).
+- Runtime: **Ollama** (localhost HTTP API) serving an open-weight GGUF model that fits the
+  4-core/8 GB CPU floor (landed: `granite4:micro`, ~3B dense, Q4_K_M ≈ 2.1 GB — see the
+  dated decision below). Runs as a second Compose service next to Postgres, models in a
+  named volume (see Docker decision below).
 - Flow: CLI prompt → embed the question (same model as Phase 3) → top-k vector search →
-  **prompt assembly** (system instructions + retrieved chunks with citations + question)
-  → Ollama → print answer + sources to the terminal.
+  **prompt assembly** (English system instructions + retrieved chunks with citations and a
+  CC BY-SA attribution notice + question) → Ollama → print answer + sources to the
+  terminal.
 - The system instructions carry **grounding and abstention directives** ("answer only from
-  the provided §§; say so if they don't contain the answer") — the prompt-level half of
-  hallucination prevention.
+  the provided excerpts; say so if they don't contain the answer") — the prompt-level half
+  of hallucination prevention.
 - The phase's generation theory chapter explains CPU inference (prefill vs decode, KV
   caching, prompt-prefix reuse — why a stable prompt layout is cheap), GGUF weight
   quantization, and the cost/benefit of chain-of-thought for a small model.
@@ -99,30 +113,33 @@ evaluation item lands the cross-cutting **evaluate** harness, not a pipeline sta
 deliberately left out.
 
 1. **Evaluation first (RAG triad):** a small gold-question set, each question labeled with
-   its expected §§; measure context relevance, faithfulness/groundedness, and answer
-   relevance with a local open-weight LLM judge via Ollama (LLM-as-a-judge,
+   its expected chunks (club/section); measure context relevance, faithfulness/groundedness,
+   and answer relevance with a local open-weight LLM judge via Ollama (LLM-as-a-judge,
    reference-free — built by hand, no RAGAS), plus deterministic rank metrics
-   against the labeled §§ (Recall@K, Precision@K, MRR, NDCG) — so every later enhancement
-   is measurable.
+   against the labeled chunks (Recall@K, Precision@K, MRR, NDCG) — so every later
+   enhancement is measurable.
 2. **Hybrid search:** Postgres full-text (BM25-style sparse retrieval) alongside dense
-   vectors; fuse with **Reciprocal Rank Fusion (RRF)**. Theory contrasts lexical sparse
-   retrieval with learned sparse embeddings (SPLADE) and RRF with score
-   normalization / weighted fusion.
+   vectors; fuse with **Reciprocal Rank Fusion (RRF)** — motivated by exact-match on club
+   names and years, where dense embeddings alone are weak (see the embedding-model
+   decision's accepted trade). Theory contrasts lexical sparse retrieval with learned sparse
+   embeddings (SPLADE) and RRF with score normalization / weighted fusion.
 3. **Metadata filtering:** scoped retrieval — filter vector/hybrid search by chunk metadata
-   (law, § number, heading path) via SQL predicates combined with pgvector; learn pre- vs
+   (club, section, section path) via SQL predicates combined with pgvector; learn pre- vs
    post-filtering and how filters interact with HNSW recall.
-4. **Query transformation:** query rewriting, query expansion (synonyms and domain
-   abbreviations), multi-query retrieval (variants fused via RRF), HyDE, query
-   decomposition — including sequential multi-hop retrieval — keyword extraction for hard
-   facts (§ numbers, exact terms), and a lightweight query router (explicit § citations go
-   to exact metadata lookup). Theory covers step-back prompting as the contrast.
+4. **Query transformation:** query rewriting, query expansion (club nicknames and
+   aliases, e.g. "Spurs" for Tottenham Hotspur), multi-query retrieval (variants fused via
+   RRF), HyDE, query decomposition — including sequential multi-hop retrieval — keyword
+   extraction for hard facts (club names, years, exact terms), and a lightweight query
+   router (explicit club-name mentions go to exact metadata lookup). Theory covers
+   step-back prompting as the contrast.
 5. **Cross-encoder reranking** of top-k results (open-source model, CPU). Theory maps the
    bi-encoder → late-interaction (ColBERT) → cross-encoder spectrum.
 6. **Advanced chunking strategies:** semantic chunking, hierarchical parent-child chunks
-   (Absatz-level children retrieved, §-level parents assembled), contextual chunk
-   enrichment (prepend heading-path/law context; optionally local-LLM chunk summaries),
-   and late chunking if the Phase 3 embedding model exposes token embeddings — each
-   compared against the Phase 2 baseline via the evaluate harness.
+   (subsection-level children retrieved, section-level parents assembled), contextual
+   chunk enrichment (prepend heading-path/article context; optionally local-LLM chunk
+   summaries), and late chunking if a future embedding model exposes token embeddings
+   (not met by the pinned bge-small-en-v1.5 — see its dated decision) — each compared
+   against the Phase 2 baseline via the evaluate harness.
 7. **Prompt/context-window management:** lost-in-the-middle ordering, token budgets
    counted with the served model's own tokenizer. Theory covers the long-context-vs-RAG
    debate.
@@ -136,20 +153,20 @@ deliberately left out.
     where the local LLM decides follow-up searches and when it can answer, with CRAG-style
     self-correction (corpus-internal — no web-search fallback). Theory places Self-RAG on
     the same spectrum.
-11. **Graph-augmented retrieval (GraphRAG):** extract the explicit §-to-§ and law-to-law
-    citation links into a lightweight graph (plain Postgres tables, no graph database) and
-    expand retrieval hits with their graph neighbors. Theory contrasts full
+11. **Graph-augmented retrieval (GraphRAG):** extract the explicit article-to-article wiki
+    links between club articles into a lightweight graph (plain Postgres tables, no graph
+    database) and expand retrieval hits with their graph neighbors. Theory contrasts full
     LLM-entity-extraction GraphRAG and its CPU cost.
 12. **Docling ingestion path** for messy PDF sources — a second connector proving the
     pipeline's interfaces: layout analysis, reading order, tables, page-level chunking with
     page-number citations, and a dated scoping decision on figures/images. Theory covers
     classic OCR + layout analysis vs end-to-end document-intelligence VLMs.
-13. **Incremental ingestion:** detect changed laws (XML builddate or content hash) and
-    reprocess only those through convert → chunk → embed → load, skipping unchanged chunks
-    at the upsert boundary.
+13. **Incremental ingestion:** detect changed articles (content hash, since Wikipedia
+    extracts carry no stable build-date field) and reprocess only those through
+    convert → chunk → embed → load, skipping unchanged chunks at the upsert boundary.
 14. **Drift detection:** embedding drift monitoring after model or corpus updates —
-    amended laws are this corpus's real drift trigger; the gold-set metrics from item 1
-    are the signal.
+    edited Wikipedia articles are this corpus's real drift trigger; the gold-set metrics
+    from item 1 are the signal.
 15. **Chat web app:** Go backend + React frontend on top of the proven pipeline.
 
 ## Decisions
@@ -173,7 +190,7 @@ prunes superseded decisions, not the verify-before-claiming discipline).
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
 | Repository license  | MIT                                                           |
 | Docker usage        | Stateful infrastructure only (see below)                      |
-| Interim runtime     | GitHub Codespace (16 vCPU / 32 GB) until a VPS is available; the 8-core/16 GB CPU-only VM stays the design floor — nothing may require more |
+| Design floor        | 4-core / 8 GB CPU-only, no GPU (lowered from 8-core/16 GB in the 2026-07 English-Wikipedia pivot) — nothing may require more; the pinned models (bge-small-en ≈ 130 MB, granite4:micro ≈ 2.1 GB served) fit the budget, re-verified end to end on 2026-07-18 (see the embedding- and generation-model decisions) |
 
 > **Assumption:** no RAG frameworks (LangChain/LlamaIndex/Haystack) — primitives are built
 > by hand from plain libraries, because the goal is learning how RAG works internally.
@@ -272,13 +289,14 @@ and everything downstream.
   pinned to 1200 characters, validated with the model's own tokenizer over the fetched corpus
   (densest ≈ 2.44 chars/token → ≤ ~492 tokens worst-case, observed max 375), and the embed
   token-guard is the hard backstop (see the [chunk contract](stages/chunk.md)).
-- **8 GB-floor measurement (measured 2026-07-17, CPU-only, `make embed` over the 20-club
-  corpus, 1333 chunks):** the model download is **≈ 130 MB** (129 MiB in
-  `~/.cache/huggingface/`, a single snapshot — no double-fetch); the full embed run took
-  **≈ 3 min 49 s** wall (≈ 5.8 chunks/s) at batch 16, comfortably within the 8 GB floor
-  without swap. A `make query` spot-check returned plausible sections ranked by cosine
-  distance (e.g. "Which stadium does Arsenal play at?" → the `Arsenal F.C. — Stadiums` chunks
-  at distance ≈ 0.20).
+- **8 GB-floor measurement (measured 2026-07-18, CPU-only, `make embed` over the 20-club
+  corpus, 1333 chunks, on the available 8-core/5.7 GB machine — a tighter RAM budget than the
+  8 GB floor):** the model download is **≈ 130 MB** (129 MiB in `~/.cache/huggingface/`, a
+  single snapshot — no double-fetch); the full embed run took **≈ 3 min 49 s** wall (≈ 5.8
+  chunks/s) at batch 16. bge-small-en's tiny footprint (vs bge-m3's ≈ 9 GiB peak RSS) fits the
+  8 GB budget with room to spare. A `make query` spot-check returned plausible sections ranked
+  by cosine distance (e.g. "Which stadium does Arsenal play at?" → the `Arsenal F.C. — Stadiums`
+  chunks at distance ≈ 0.20).
 - **Accepted trade:** bge-small is far weaker than bge-m3 in absolute retrieval quality — a
   deliberate trade for a model that fits 4-core/8 GB and reads to an English audience, not a
   silent downgrade. Exact-match on club names and years still motivates hybrid BM25 + RRF
@@ -313,10 +331,9 @@ decoding parameters, and the retrieval top-k, pinned together for the online pat
   [`src/rag/retrieve/`](../src/rag/retrieve/__init__.py); the Makefile derives the
   `make llm-pull` tag from the constant instead of duplicating the string.
 - **Why granite4:micro (verified live 2026-07-18):**
-  - **Fits the 8 GB floor without swap.** Q4_K_M ≈ 2.1 GB of weights plus the KV cache for a
-    4096-token window serve comfortably in RAM on a 4-core/8 GB machine — the swap-bound
-    2.0–3.5 tok/s of the former 4 B model (3.9 GB served) is gone. This RAM fit, not raw speed,
-    is the win.
+  - **Fits the 8 GB floor.** Q4_K_M ≈ 2.1 GB of weights plus the KV cache for a 4096-token
+    window fit the 8 GB budget with headroom — where the former 4 B model (3.9 GB served) went
+    swap-bound at 2.0–3.5 tok/s. This RAM fit, not raw speed, is the win.
   - **Strict license, verified.** Weights Apache-2.0 (model card, 2026-07-18), in the official
     Ollama library — no community re-uploads of unverifiable provenance.
   - **Plain instruct — no reasoning traces.** Granite-4.0-Micro emits no `<think>`/reasoning
@@ -335,14 +352,17 @@ decoding parameters, and the retrieval top-k, pinned together for the online pat
   the guard fits the window. A realistic k=5 prompt is ≈ 1,040 tokens — far under the budget;
   an oversized prompt trips the loud `AssembleError` rather than being silently truncated.
   Token-exact budgeting with the served model's tokenizer stays Backlog 7.
-- **8 GB-floor serving validation (measured 2026-07-18, CPU-only):** `make llm-pull`
-  (granite4:micro) then `make ask Q="Which stadium does Arsenal play at?"` streamed a grounded,
-  cited answer — **"Arsenal plays at the Emirates Stadium [3]."** — with an 840-token prompt in
-  ≈ 51 s prefill + ≈ 1.6 s decode (≈ 58 s total on CPU). An abstention probe,
-  `make ask Q="What is the capital of France?"`, correctly declined ("the excerpts provided do
-  not contain any information about the capital of France … impossible to answer this
-  question"). The model served within the 4-core/8 GB floor **without swap** — prefill-bound,
-  not swap-bound.
+- **Serving validation (measured 2026-07-18, CPU-only, on the available 8-core/5.7 GB machine
+  — a tighter RAM budget than the 8 GB floor):** `make llm-pull` (granite4:micro) then
+  `make ask Q="Which stadium does Arsenal play at?"` streamed a grounded, cited answer —
+  **"Arsenal plays at the Emirates Stadium [3]."** — with an 840-token prompt in ≈ 51 s prefill
+  + ≈ 1.6 s decode (≈ 58 s total). An abstention probe, `make ask Q="What is the capital of
+  France?"`, correctly declined ("the excerpts provided do not contain any information about
+  the capital of France … impossible to answer this question"). granite is **prefill-bound, not
+  swap-bound** (decode ≈ 7 tok/s vs the former model's swap-bound 2.0–3.5 on the same box) — the
+  RAM fit that motivated the choice, confirmed. A pristine no-swap run on exact 4-core/8 GB
+  hardware was not performed; the 4-core/8 GB is the design floor, justified by the ≈ 2.1 GB
+  served footprint.
 - **Consequences:** the online path pins greedy, num_ctx 4096; `qwen3:4b-instruct` is removed
   from the Ollama volume (`ollama rm`); the model download cost (≈ 2.1 GB) is stated in the
   README quick start; if per-question latency on 8 GB is still too high, the next lever is the
@@ -354,8 +374,8 @@ CC BY-SA 4.0, properly licensed for the playbook's gitignored, runtime-fetched u
 - **Context:** the fetch stage ingests article extracts from the English Wikipedia
   MediaWiki Action API, and rule 3 in [AGENTS.md](../AGENTS.md) demands that only
   public-domain or properly licensed sources enter the corpus. Wikipedia text is a genuine
-  step down from the amtliche-Werke cleanliness of the former law corpus, so its terms are
-  pinned here from primary sources rather than asserted.
+  step down from a public-domain corpus, so its terms are pinned here from primary sources
+  rather than asserted.
 - **Facts (all verified live 2026-07-17):** English Wikipedia prose is licensed
   **CC BY-SA 4.0** (Wikipedia:Copyrights + the Wikimedia Terms of Use; the GFDL is
   dual-listed as a legacy licence), **not public domain**. Attribution is satisfied by a
@@ -366,8 +386,7 @@ CC BY-SA 4.0, properly licensed for the playbook's gitignored, runtime-fetched u
   the text in the local database is **not a distribution event** — no copyleft attaches to
   the repo. Displaying a retrieved excerpt *is* a reproduction, so the online path shows the
   **article link and a CC BY-SA licence notice at the point of display** (the assemble/ask
-  stage). This qualifies as "properly licensed" under rule 3; the § 5 UrhG public-domain
-  basis of the former law corpus no longer applies.
+  stage). This qualifies as "properly licensed" under rule 3.
 - **Consequences:** convert emits **prose only** — TextExtracts already strips images,
   flattens tables and lists, and drops the reference apparatus, and convert drops the
   remaining non-prose apparatus sections (References, External links, See also, …); the

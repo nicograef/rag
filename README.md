@@ -1,9 +1,9 @@
 # RAG Playbook
 
 A production-shaped, self-hosted, framework-free reference implementation of
-Retrieval-Augmented Generation (RAG) over **German federal law**, for developers who want to
-learn RAG hands-on — by reading and running a real system, stage by stage, with the theory
-next to the code. A **learning project** by [Nico](https://github.com/nicograef) that
+Retrieval-Augmented Generation (RAG) over **English Wikipedia** (the 20 current Premier
+League football clubs), for developers who want to learn RAG hands-on — by reading and
+running a real system, stage by stage, with the theory next to the code. A **learning project** by [Nico](https://github.com/nicograef) that
 doubles as a public playbook — in that order.
 
 What it is **not**: a product, a hosted service, or supported software — and it never claims
@@ -13,10 +13,13 @@ to be state of the art. It teaches durable building blocks and records every con
 The constraints are the features:
 
 - **Open-source only** — every tool, library, and model; no cloud accounts, no paid APIs.
-- **CPU-only** — designed for an 8-core / 16 GB VM; nothing may require a GPU or more.
+- **CPU-only** — designed for a 4-core / 8 GB VM (the design floor, justified by the model
+  footprints in the roadmap's [hardware-floor decision](docs/roadmap.md#decisions)); nothing
+  may require a GPU or more.
 - **No RAG frameworks** — no LangChain, LlamaIndex, or Haystack; every primitive is built by
   hand from plain libraries, so reading the code teaches RAG, not a framework.
-- **Real public-domain corpus** — German federal law with genuine structure, not a toy blog post.
+- **Real, properly-licensed corpus** — English Wikipedia (Premier League clubs), CC BY-SA 4.0
+  with attribution, with genuine section structure, not a toy blog post.
 - **Re-runnable from a clean checkout** — no data artifacts in git; every stage rebuilds its output.
 
 ## Status
@@ -43,21 +46,6 @@ in the [roadmap](docs/roadmap.md).
 > block and a CC BY-SA notice. The wrap-up slice re-verifies the whole loop from a clean
 > checkout on the 4-core/8 GB floor and finishes the positioning/corpus prose below.
 
-Quick start last verified from a clean checkout: **2026-07-14** — every step below as
-written: dev setup, `make db` including the image pull, `make check`, the full pipeline
-on the live corpus (`make fetch` through `make load`, 1,225 chunks — the first
-`make embed` including the model download), and a `make query` retrieval spot-check
-(recorded in the [load contract](docs/stages/load.md#verification)).
-
-Phase 4 verified end to end: **2026-07-17** — the full offline pipeline re-run from a
-live `make fetch` through `make load` (1,225 chunks), then `make llm`, `make llm-pull`,
-and real `make ask` runs (the dated spot-check in the
-[generate contract](docs/stages/generate.md#verification)). That run used an 8-core /
-5.7 GB machine — *below* the 16 GB design floor: serving works with the pinned 4B model
-but takes minutes per answer there (measured numbers in the
-[generation-model decision](docs/roadmap.md#decisions)), and `make embed`'s pinned batch
-size needs the floor, so the embed step ran with a reduced batch.
-
 ## Quick start
 
 What runs today (Phases 0–4): the dev setup, the checks, the database, the whole
@@ -82,13 +70,14 @@ make ask Q="Which stadium does Arsenal play at?"   # grounded answer with citati
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
 Compose plugin, and Python 3.12 (uv installs one if missing).
 
-**First-run costs** (deps and model measured 2026-07-14, image/corpus 2026-07-11/12):
+**First-run costs** (deps and model measured 2026-07-14, image 2026-07-11):
 ~1.2 GB of Python dependencies (PyTorch dominates even as the CPU-only build — torch is
 pinned to the PyTorch CPU wheel index in `pyproject.toml`, which avoids the ~4 GB of
 CUDA libraries the default PyPI wheels bundle; the dev tools alone are ~65 MB), a
 one-time ~160 MB (compressed) pull of the
-`pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
-four-law MVP corpus, and a one-time **~130 MB download of the pinned embedding model**
+`pgvector/pgvector:pg17` image, the Wikipedia extracts for the 20-club corpus (fetched at
+runtime, gitignored; a few MB of text), and a one-time **~130 MB download of the pinned
+embedding model**
 (`BAAI/bge-small-en-v1.5`) into `~/.cache/huggingface/` on the first `make embed` (measured
 2026-07-17; details in the [model decision](docs/roadmap.md#decisions)). The online path adds (measured
 2026-07-18): a one-time pull of the pinned `ollama/ollama:0.32.1` image (≈ 8 GB on
@@ -103,10 +92,10 @@ on disk or database state:
 
 | Stage       | Responsibility                  | Input → output artifact                          |
 | ----------- | ------------------------------- | ------------------------------------------------ |
-| **[fetch](docs/stages/fetch.md)**     | acquire the source      | source → raw files (official law XML) |
+| **[fetch](docs/stages/fetch.md)**     | acquire the source      | source → raw files (Wikipedia article extracts) |
 | **[convert](docs/stages/convert.md)** | make the source workable | raw files → clean Markdown corpus    |
 | **[chunk](docs/stages/chunk.md)**     | slice into retrieval units | corpus → chunk records with metadata  |
-| **[embed](docs/stages/embed.md)**     | turn text into vectors  | chunk records → vectors (JSONL per law) |
+| **[embed](docs/stages/embed.md)**     | turn text into vectors  | chunk records → vectors (JSONL per article) |
 | **[load](docs/stages/load.md)**       | own the database (incl. schema and indexes) | chunk records + vectors → database |
 
 The **online path** answers a question in one process — `make ask` wraps
@@ -129,7 +118,7 @@ offline contracts are linked above. The Phase 1 chapter,
 [corpus & parsing](docs/theory/corpus-and-parsing.md), explains why corpus choice,
 licensing, and lossless parsing are RAG decisions; the Phase 2 chapter,
 [chunking](docs/theory/chunking.md), explains why chunk size matters and why
-structure-aware chunking beats fixed-size splitting for law texts; the Phase 3 chapters,
+structure-aware chunking beats fixed-size splitting on structured text; the Phase 3 chapters,
 [embeddings](docs/theory/embeddings.md) and
 [vector indexes](docs/theory/vector-indexes.md), explain how meaning becomes geometry and
 how HNSW searches it fast; the Phase 4 chapter,
@@ -142,27 +131,30 @@ or a recorded reason it is deliberately out of scope.
 
 ## The corpus — and swapping it
 
-German federal law (XML from gesetze-im-internet.de) is a deliberate feature: real structure
-(law → Buch/Abschnitt → § → Absatz) makes structure-aware chunking and citations a genuine
-lesson instead of a toy exercise, and the norm texts are amtliche Werke (§ 5 UrhG) — public
-domain. The full argument is the [corpus & parsing](docs/theory/corpus-and-parsing.md)
-chapter. The corpus is German-language; that limitation is acknowledged and offset by the
-swap path.
+English Wikipedia — the 20 current Premier League clubs (`clubs.toml`), fetched as plain-text
+extracts from the MediaWiki API — is a deliberate feature: each article carries a real heading
+hierarchy (article → `== section ==` → `=== subsection ===`) that makes structure-aware
+chunking and citations a genuine lesson instead of a toy exercise. Be honest about the scale:
+two or three heading levels of encyclopedic prose is a **lighter** version of that lesson than
+deeply nested reference works (legal codes, technical manuals) would teach — real structure,
+not rich structure. Wikipedia text is **CC BY-SA 4.0 with attribution**, not public domain, so
+it clears rule 3 on the "properly licensed" clause; the full argument, and why that obligation
+stays cheap here, is the [corpus & parsing](docs/theory/corpus-and-parsing.md) chapter.
 
 **Swapping in your own corpus** — the honest blast radius: reimplement **fetch** and
 **convert** for your source, and adapt the chunker's structural logic and citation fields to
-your documents' structure. The chunk-record contract uses corpus-neutral field names, and
-each stage contract states exactly which fields downstream stages require — so the boundary
-is explicit, not discovered. The first two contracts ([fetch](docs/stages/fetch.md),
-[convert](docs/stages/convert.md)) are landed; the rest arrive with their phases (status
-table above).
+your documents' structure. The chunk-record contract uses corpus-neutral field names
+(`source_title`, `unit`, `section_path`, `citation`), and each stage contract states exactly
+which fields downstream stages require — so the boundary is explicit, not discovered. The
+first two contracts ([fetch](docs/stages/fetch.md), [convert](docs/stages/convert.md)) are
+landed; the rest arrive with their phases (status table above).
 
 ## Project status & support
 
 This is a learning project first; the maintainer sets the pacing and scope. Each landed
 phase is complete on its own — code, tests, theory chapter, runnable stage — but the
 playbook as a whole is a work in progress. There is **no support, no SLA, and no
-contribution program**. Between phases, external dependencies (the law-XML endpoint, model
+contribution program**. Between phases, external dependencies (the Wikipedia API, model
 hosting) can rot; each phase re-verifies the quick start and records the date.
 
 ## Structure
@@ -193,4 +185,7 @@ contributor- and agent-facing lives in [AGENTS.md](AGENTS.md).
 ## License
 
 MIT — see [LICENSE](LICENSE).
-The ingested law texts are amtliche Werke (§ 5 UrhG) and remain public domain.
+The ingested Wikipedia article text is **CC BY-SA 4.0** (not public domain; verified
+2026-07-17). The corpus is gitignored and fetched at runtime — never redistributed in git —
+so no copyleft attaches to this repo; displayed excerpts carry attribution (the article link)
+and a licence notice, shown by `make ask`.

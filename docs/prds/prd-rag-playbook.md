@@ -17,7 +17,7 @@ clone and run end to end on an ordinary dev machine, with the theory explained n
 code that implements it.
 
 This repository's constraints already match that gap — open-source only, CPU-only, no
-frameworks, real public-domain corpus — but it is currently a scaffold whose documentation
+frameworks, a real, properly-licensed corpus — but it is currently a scaffold whose documentation
 addresses one person. The README describes the project and its dev commands, but from the
 maintainer's context: no audience statement, no landed-versus-planned status, no stage
 contracts, no theory, no support policy. The big picture exists only implicitly in the
@@ -27,7 +27,8 @@ roadmap; there is no product-level statement of audience, promises, and non-prom
 
 Reposition the repository as a **RAG playbook**: a production-shaped, self-hosted,
 framework-free reference implementation of a complete RAG system over a real corpus
-(German federal law), that a learner can clone and run on their own machine.
+(English Wikipedia — the 20 current Premier League clubs), that a learner can clone and
+run on their own machine.
 
 The playbook rests on four pillars:
 
@@ -110,11 +111,12 @@ corpus actually requires.
   explicitly not "state of the art". No claim in the docs may depend on staying current;
   time-sensitive claims carry the date they were last verified.
 - Existing constraints are elevated to product features and stated as such: open-source
-  only, CPU-only (8-core/16 GB design floor), no RAG frameworks, real public-domain
-  corpus, everything re-runnable from a clean checkout, no data artifacts in git. Feature
-  status carries proof obligations: first-run downloads (embedding model, LLM weights,
-  container images — several gigabytes) are documented up front, and the 16 GB floor is
-  validated and recorded when the embedding-model and LLM decisions land.
+  only, CPU-only (4-core/8 GB design floor), no RAG frameworks, a real, properly-licensed
+  corpus (English Wikipedia, CC BY-SA 4.0 with attribution), everything re-runnable from a
+  clean checkout, no data artifacts in git. Feature status carries proof obligations:
+  first-run downloads (embedding model, LLM weights, container images — several gigabytes)
+  are documented up front, and the 8 GB floor is validated and recorded when the
+  embedding-model and LLM decisions land.
 
 **Architecture: stage = module**
 
@@ -150,7 +152,7 @@ corpus actually requires.
   functions.
 - Corpus swap is a documented reader path with honest edges: the chunk-record contract
   uses corpus-neutral field names (source identifier, section path, citation label) with
-  German-law values as the first instantiation. Swapping a corpus means reimplementing
+  Wikipedia-article values as the first instantiation. Swapping a corpus means reimplementing
   fetch and convert for the new source **and** adapting the chunker's structural logic and
   citation fields to the new document structure; the contracts document exactly which
   fields downstream stages require, so this blast radius is explicit rather than
@@ -181,14 +183,17 @@ corpus actually requires.
 
 **Corpus**
 
-- German federal law (gesetze-im-internet.de XML) stays the single corpus. It is a
-  feature: real structure (law → § → Absatz) makes structure-aware chunking a genuine
-  lesson instead of a toy. The German-language limitation is acknowledged in the docs and
-  offset by the documented corpus-swap path.
-- Licensing: § 5 UrhG places the norm texts (amtliche Werke) in the public domain. The
-  claim is verified against the source's terms of use when the fetch stage lands and
-  recorded as a dated decision; non-normative editorial apparatus in the XML (footnotes,
-  editorial status notes) is excluded by convert unless that verification covers it.
+- English Wikipedia — the articles of the 20 current Premier League clubs — is the single
+  corpus, fetched at runtime via the MediaWiki API. It is a feature: a real heading
+  hierarchy (article → == section == → === subsection ===) keeps structure-aware chunking
+  a genuine lesson instead of a toy, and the English content reads to any learner. That the
+  domain is more conventional than richly-structured law is acknowledged in the docs; the
+  gain — runs on any laptop, reads to anyone — is the deliberate reason.
+- Licensing: Wikipedia text is CC BY-SA 4.0 — properly licensed, not public domain. The
+  claim is verified against Wikipedia's copyright terms when the fetch stage lands and
+  recorded as a dated decision. Because `data/` is gitignored (the corpus is fetched at
+  runtime, never redistributed in git) the repo incurs no share-alike obligation; the one
+  live requirement is attribution on displayed excerpts, satisfied at the point of display.
 
 **Scope of this PRD**
 
@@ -202,19 +207,20 @@ corpus actually requires.
 
 - A good test exercises a stage's external contract — given this input, that output —
   never its internal helpers. Fixtures are small, checked-in samples (e.g. a truncated
-  law XML); real corpus data stays out of git.
+  Wikipedia extract); real corpus data stays out of git.
 - Every offline stage gets contract tests on its public entry point. Determinism is
   promised honestly, per stage: **convert** and **chunk** are pure transforms — same
   input artifact, same output, asserted exactly. **embed** promises reproducibility
   within a tolerance (similarity against checked-in reference vectors on small fixtures),
   never bitwise equality — CPU floating-point results vary across machines. **fetch**
   promises idempotence (re-running overwrites cleanly), not determinism — the source is a
-  living corpus and amended laws legitimately change its output.
+  living corpus and edits to the articles (squads, managers, honours) legitimately change
+  its output.
 - Documentation verification is a manual review-checklist item — links and referenced
   paths must exist when a change lands; no link-checker tooling is built under this PRD.
 - The quick start is verified from a clean checkout each time a phase lands, and the
   verification date is recorded with the README status. Between phases, external
-  dependencies (the law XML endpoint, model hosting) can rot; the support policy states
+  dependencies (the Wikipedia API, model hosting) can rot; the support policy states
   this explicitly.
 - Prior art: the existing smoke test (import + version) establishes the pattern of testing
   through the package's public surface; stage contract tests extend it.
@@ -241,15 +247,32 @@ Known risks, accepted deliberately:
   Mitigation: they are written in-phase while the concept is fresh; chapters stay concise.
 - **Incompleteness is public.** Mitigated by the chapter-by-chapter framing and the README
   status table that gates every runnable-experience claim.
-- **The German corpus limits relatability** for non-German readers. Accepted for its
-  realism and licensing clarity; mitigated by the documented corpus-swap path.
-- **Pinned choices and external dependencies age.** Model choices rot, the XML endpoint
+- **CC BY-SA is not public domain.** Wikipedia text is properly licensed, not public
+  domain — a genuine step down from a public-domain corpus. Neutralized by the gitignored,
+  runtime-fetched corpus (no distribution event, so no share-alike attaches to the repo)
+  and by attribution on every displayed excerpt.
+- **The corpus is volatile.** Squads, managers, and league membership change continuously,
+  so fetch is idempotent by design, not deterministic — re-running legitimately changes its
+  output. This makes the incremental-ingestion and drift-detection backlog items more
+  naturally motivated, not less.
+- **Aggregation questions are a real limit.** "Which club has won the most titles?" needs
+  cross-article aggregation a single-pass top-k retriever answers poorly — an honest demo
+  limitation that motivates the multi-hop/agentic backlog, not a defect to hide.
+- **bge-small is weaker than a full multilingual model.** A deliberate trade for a model
+  that fits the 4-core/8 GB floor and reads to an English audience; recorded as a trade,
+  not a silent downgrade.
+- **The demo domain is more conventional than richly-structured law.** Football-over-
+  Wikipedia is closer to a standard RAG demo; sectioned articles keep it above a toy blog
+  post, but the domain-richness trade is real and named. The gain — runs on any laptop,
+  reads to anyone — is the deliberate reason.
+- **Pinned choices and external dependencies age.** Model choices rot, the Wikipedia API
   and model hosting can change between phases. Mitigated by dating every decision and
   every quick-start verification, and by the explicit support policy — never by promising
   currency.
-- **The 16 GB floor is a constraint to validate, not a verified claim.** Embedding model,
-  7–8B-class LLM, and Postgres must coexist at query time; feasibility is confirmed and
-  recorded when the model decisions land.
+- **The 8 GB floor is a constraint to validate, not a verified claim.** The embedding
+  model (bge-small-en ≈ 130 MB), the ≈ 3 B granite4:micro (≈ 2.1 GB served), and Postgres
+  must coexist at query time; feasibility is confirmed and recorded when the model
+  decisions land (see the roadmap hardware-floor decision).
 - **Over-slicing temptation.** The taxonomy may only grow when a phase lands a genuinely
   new responsibility, by amending this PRD in the same change; speculative granularity
   and speculative interfaces remain forbidden. Simple over clever remains the rule.

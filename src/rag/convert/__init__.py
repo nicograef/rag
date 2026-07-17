@@ -6,9 +6,8 @@ provenance, an H1 from the article title, and the article's ``== section ==`` /
 ``=== subsection ===`` wiki headings translated to ATX headings (``##`` / ``###``). The lead
 paragraphs (the text before the first heading) become an ``## Introduction`` section so they
 are a chunkable unit like every other section. Non-prose apparatus sections (References,
-External links, See also, …) are dropped — the Wikipedia analogue of the law converter's
-footnote/table-of-contents exclusion — leaving a clean prose corpus. The transform is
-deterministic: same extract, byte-identical output.
+External links, See also, …) are dropped so only article prose reaches chunking — a
+licensing-and-quality act. The transform is deterministic: same extract, byte-identical output.
 
 Stage contract: docs/stages/convert.md
 Theory: docs/theory/corpus-and-parsing.md
