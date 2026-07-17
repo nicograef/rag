@@ -2,8 +2,9 @@
 
 Not a fourth stage: a thin CLI that wires the three online stages into one command. It
 retrieves the top-k chunks for a question, assembles the grounded prompt, and streams the
-model's answer to stdout token by token, then prints the numbered ``Quellen:`` block for the
-chunks it drew on. Every step logs one line to stderr — the question, each hit, the prompt
+model's answer to stdout token by token, then prints the numbered ``Sources:`` block and a
+CC BY-SA licence notice for the Wikipedia excerpts it drew on. Every step logs one line to
+stderr — the question, each hit, the prompt
 size, and the final generation stats — so a run stays inspectable without touching the
 answer on stdout. ``retrieve_fn`` and ``generate_fn`` are injectable, so the whole flow is
 testable with fakes (no database, model, or network).
@@ -26,6 +27,11 @@ from rag.retrieve import (
     check_connection_settings,
     retrieve,
 )
+
+# The corpus is English Wikipedia (CC BY-SA 4.0); displaying a retrieved excerpt is a
+# reproduction, so every answer surfaces the article links and this licence notice — the
+# attribution obligation satisfied at the point of display.
+LICENCE_NOTICE = "Excerpts from English Wikipedia, licensed CC BY-SA 4.0."
 
 # The two injectable seams: retrieve turns a question and k into ranked chunks; generate
 # turns a prompt and a live delta callback into an answer with stats. Tests pass fakes.
@@ -87,7 +93,8 @@ def main(
 ) -> int:
     """Answer one question end to end: retrieve, assemble, generate, and cite the sources.
 
-    The answer streams to stdout token by token, followed by a numbered ``Quellen:`` block;
+    The answer streams to stdout token by token, followed by a numbered ``Sources:`` block
+    and a CC BY-SA licence notice;
     every step logs one line to stderr. ``retrieve_fn`` and ``generate_fn`` are injectable
     for tests; their defaults wrap the real stages and construct the embedding model lazily,
     only when neither an embedder nor a ``retrieve_fn`` was injected. Returns 0 on success,
@@ -95,7 +102,7 @@ def main(
     """
     parser = argparse.ArgumentParser(
         prog='python -m rag.ask "<question>"',
-        description="Answer a question about German federal law from the retrieved chunks.",
+        description="Answer a question about a football club from the retrieved Wikipedia excerpts.",
     )
     parser.add_argument("question", help="the question to answer")
     parser.add_argument("--top-k", type=int, default=TOP_K, help="number of chunks to retrieve")
@@ -146,9 +153,11 @@ def main(
     # the sources block.
     print()
     print()
-    print("Quellen:")
+    print("Sources:")
     for number, hit in enumerate(hits, start=1):
         print(f"[{number}] {hit.citation} — {hit.source_url}")
+    print()
+    print(LICENCE_NOTICE)
 
     _log_stats(result.stats)
     return 0

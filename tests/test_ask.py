@@ -2,37 +2,37 @@
 
 ``ask.main`` wires retrieve → assemble → generate. The tests inject fake ``retrieve_fn`` and
 ``generate_fn`` so the flow runs offline, and pin the two contracts a caller depends on: the
-stdout shape (streamed answer, blank line, numbered ``Quellen:`` block) and the one-line-per-
+stdout shape (streamed answer, blank line, numbered ``Sources:`` block, licence notice) and the one-line-per-
 step stderr log. ``assemble`` is exercised for real — it is a pure function.
 """
 
 import pytest
 
-from rag.ask import main
+from rag.ask import LICENCE_NOTICE, main
 from rag.assemble import SYSTEM_PROMPT
 from rag.generate import GenerateError, GenerateResult, GenerationStats
 from rag.retrieve import RetrievedChunk, RetrieveError
 
 HITS = [
     RetrievedChunk(
-        id="ao#146a",
-        source_title="AO",
-        citation="§ 146a AO",
-        source_url="https://example.test/ao/146a",
-        text="Text eins.",
+        id="arsenal#History",
+        source_title="Arsenal F.C.",
+        citation="Arsenal F.C. — History",
+        source_url="https://en.wikipedia.org/wiki/Arsenal_F.C.",
+        text="First excerpt.",
         distance=0.1,
     ),
     RetrievedChunk(
-        id="ao#147",
-        source_title="AO",
-        citation="§ 147 AO",
-        source_url="https://example.test/ao/147",
-        text="Text zwei.",
+        id="arsenal#Stadiums",
+        source_title="Arsenal F.C.",
+        citation="Arsenal F.C. — Stadiums",
+        source_url="https://en.wikipedia.org/wiki/Arsenal_F.C.",
+        text="Second excerpt.",
         distance=0.2,
     ),
 ]
 
-DELTAS = ["Para", "graf ", "eins."]
+DELTAS = ["Ars", "enal play ", "at the Emirates."]
 STATS = GenerationStats(
     prompt_tokens=42,
     answer_tokens=7,
@@ -68,7 +68,7 @@ def test_happy_path_streams_answer_then_sources_and_logs_each_step(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     exit_code = main(
-        ["Wie muss eine Kasse gesichert sein?", "--top-k", "2"],
+        ["Where does Arsenal play?", "--top-k", "2"],
         retrieve_fn=_retrieve_returning(HITS),
         generate_fn=_generate_streaming(DELTAS, STATS),
     )
@@ -78,12 +78,12 @@ def test_happy_path_streams_answer_then_sources_and_logs_each_step(
 
     answer = "".join(DELTAS)
     sources = "".join(f"[{n}] {hit.citation} — {hit.source_url}\n" for n, hit in enumerate(HITS, 1))
-    assert captured.out == f"{answer}\n\nQuellen:\n{sources}"
+    assert captured.out == f"{answer}\n\nSources:\n{sources}\n{LICENCE_NOTICE}\n"
 
     err = captured.err
-    assert "question: Wie muss eine Kasse gesichert sein?" in err
-    assert "hit 1: (0.1000) § 146a AO" in err
-    assert "hit 2: (0.2000) § 147 AO" in err
+    assert "question: Where does Arsenal play?" in err
+    assert "hit 1: (0.1000) Arsenal F.C. — History" in err
+    assert "hit 2: (0.2000) Arsenal F.C. — Stadiums" in err
     assert "prompt: " in err and "(system " in err and "user " in err
     assert "generation: 42 prompt + 7 answer tokens" in err
     assert "total 3.0s, done: stop" in err
@@ -97,7 +97,7 @@ def test_top_k_is_passed_through_to_retrieve_fn() -> None:
         return HITS
 
     main(
-        ["frage", "--top-k", "3"],
+        ["a question", "--top-k", "3"],
         retrieve_fn=retrieve_fn,
         generate_fn=_generate_streaming(DELTAS, STATS),
     )
@@ -107,14 +107,14 @@ def test_top_k_is_passed_through_to_retrieve_fn() -> None:
 
 def test_a_non_positive_top_k_is_rejected_at_parsing(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit):
-        main(["frage", "--top-k", "0"])
+        main(["a question", "--top-k", "0"])
 
     assert "--top-k must be at least 1" in capsys.readouterr().err
 
 
 def test_verbose_dumps_both_prompt_parts_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:
     main(
-        ["frage", "--verbose"],
+        ["a question", "--verbose"],
         retrieve_fn=_retrieve_returning(HITS),
         generate_fn=_generate_streaming(DELTAS, STATS),
     )
@@ -123,12 +123,12 @@ def test_verbose_dumps_both_prompt_parts_to_stderr(capsys: pytest.CaptureFixture
     assert "--- system prompt ---" in err
     assert "--- user message ---" in err
     assert SYSTEM_PROMPT in err
-    assert "Text eins." in err  # a chunk body only appears in the dumped user message
+    assert "First excerpt." in err  # a chunk body only appears in the dumped user message
 
 
 def test_without_verbose_the_prompt_is_not_dumped(capsys: pytest.CaptureFixture[str]) -> None:
     main(
-        ["frage"],
+        ["a question"],
         retrieve_fn=_retrieve_returning(HITS),
         generate_fn=_generate_streaming(DELTAS, STATS),
     )
@@ -150,7 +150,7 @@ def test_default_retrieve_path_checks_settings_before_the_model(
         lambda: pytest.fail("the real embedder must not be constructed"),
     )
 
-    exit_code = main(["frage"])  # no injected retrieve_fn — the real CLI path
+    exit_code = main(["a question"])  # no injected retrieve_fn — the real CLI path
 
     captured = capsys.readouterr()
     assert exit_code == 1
@@ -165,7 +165,7 @@ def test_a_retrieve_error_exits_one_with_the_hint_on_stderr(
         raise RetrieveError("the chunks table is empty — run `make load` first")
 
     exit_code = main(
-        ["frage"], retrieve_fn=retrieve_fn, generate_fn=_generate_streaming(DELTAS, STATS)
+        ["a question"], retrieve_fn=retrieve_fn, generate_fn=_generate_streaming(DELTAS, STATS)
     )
 
     captured = capsys.readouterr()
@@ -176,7 +176,7 @@ def test_a_retrieve_error_exits_one_with_the_hint_on_stderr(
 
 def test_no_hits_makes_assemble_fail_and_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
-        ["frage"],
+        ["a question"],
         retrieve_fn=_retrieve_returning([]),
         generate_fn=_generate_streaming(DELTAS, STATS),
     )
@@ -193,7 +193,7 @@ def test_a_generate_error_exits_one_with_the_hint(capsys: pytest.CaptureFixture[
             "Ollama not reachable at http://localhost:11434: refused — run `make llm` first"
         )
 
-    exit_code = main(["frage"], retrieve_fn=_retrieve_returning(HITS), generate_fn=generate_fn)
+    exit_code = main(["a question"], retrieve_fn=_retrieve_returning(HITS), generate_fn=generate_fn)
 
     captured = capsys.readouterr()
     assert exit_code == 1
@@ -205,13 +205,13 @@ def test_deltas_reach_stdout_even_when_generate_fails_midstream(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     def generate_fn(prompt, on_delta):
-        on_delta("Teil")
-        on_delta("antwort")
+        on_delta("Part")
+        on_delta("ial answer")
         raise GenerateError("an unexpected error occurred")
 
-    exit_code = main(["frage"], retrieve_fn=_retrieve_returning(HITS), generate_fn=generate_fn)
+    exit_code = main(["a question"], retrieve_fn=_retrieve_returning(HITS), generate_fn=generate_fn)
 
     captured = capsys.readouterr()
     assert exit_code == 1
-    assert captured.out == "Teilantwort\n"  # the partial answer plus its closing newline
+    assert captured.out == "Partial answer\n"  # the partial answer plus its closing newline
     assert "an unexpected error occurred" in captured.err

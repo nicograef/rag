@@ -26,7 +26,7 @@ from rag.generate import (
     ollama_base_url,
 )
 
-PROMPT = Prompt(system="Du bist ein Assistent.", user="Was regelt § 1?")
+PROMPT = Prompt(system="You are an assistant.", user="Where does the club play?")
 
 # The delta lines carry incremental content; the final line carries `done` and the stats.
 DELTA_LINES = (
@@ -212,7 +212,7 @@ def test_generate_answers_a_tiny_prompt_from_the_real_model() -> None:
     if reason:
         pytest.skip(reason)
 
-    prompt = Prompt(system="Antworte mit einem Wort.", user="Sag Hallo.")
+    prompt = Prompt(system="Answer with one word.", user="Say hello.")
     deltas: list[str] = []
     result = generate(prompt, on_delta=deltas.append)
 

@@ -32,15 +32,19 @@ if TYPE_CHECKING:
     # budget constants (NUM_CTX, NUM_PREDICT) at load time.
     from rag.assemble import Prompt
 
-# Pinned by the dated LLM decision in docs/roadmap.md ("Generation model", 2026-07-17):
+# Pinned by the dated LLM decision in docs/roadmap.md ("Generation model", 2026-07-18):
 # model, context length, and decoding parameters form one context budget and are chosen
-# together — the reasoning lives in the decision entry, the values live here.
-MODEL_TAG = "qwen3:4b-instruct"
-NUM_CTX = 8192
-NUM_PREDICT = 1024
-TEMPERATURE = 0.7
-TOP_P = 0.8
-TOP_K = 20
+# together — the reasoning lives in the decision entry, the values live here. The model tag
+# and context/answer budget are env-overridable with the pinned value as the default.
+MODEL_TAG = os.environ.get("LLM_MODEL_TAG", "granite4:micro")
+NUM_CTX = int(os.environ.get("LLM_NUM_CTX", "4096"))
+NUM_PREDICT = int(os.environ.get("LLM_NUM_PREDICT", "512"))
+# Greedy decoding: the Granite card gives no task-specific sampling guidance, and a grounded
+# citation task wants the single most-likely, reproducible answer — not sampled variety. At
+# temperature 0 top_p/top_k are inert; the seed is pinned so the rare tie breaks the same way.
+TEMPERATURE = 0.0
+TOP_P = 1.0
+TOP_K = 0
 MIN_P = 0.0
 SEED = 42
 
@@ -87,8 +91,8 @@ def ollama_base_url() -> str:
 def _chat_payload(prompt: "Prompt") -> dict[str, Any]:
     """The ``/api/chat`` request body: the two messages plus the pinned decoding options.
 
-    ``num_ctx`` MUST be sent — Ollama's CPU default context is 4096, below this prompt's
-    budget. Unknown ``options`` keys are silently ignored by the server.
+    ``num_ctx`` is sent explicitly to pin the context window regardless of the server's
+    default (which varies by Ollama version). Unknown ``options`` keys are ignored by the server.
     """
     return {
         "model": MODEL_TAG,

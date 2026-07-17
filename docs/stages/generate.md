@@ -40,26 +40,38 @@ configuration mechanism exists (this mirrors load's `connection_conninfo()`).
 
 The model tag and decoding parameters are **pinned module constants**, not configuration,
 because the model, context length, and decoding parameters are one joint choice — the
-[generation-model decision](../roadmap.md#decisions) (`qwen3:4b-instruct`, decided
-2026-07-17):
+[generation-model decision](../roadmap.md#decisions) (`granite4:micro`, decided
+2026-07-18):
 
-| Constant       | Value             | Meaning                                             |
-| -------------- | ----------------- | --------------------------------------------------- |
-| `MODEL_TAG`    | `qwen3:4b-instruct` | The Ollama model tag                              |
-| `NUM_CTX`      | 8192              | Context window sent per request (see the pitfall below) |
-| `NUM_PREDICT`  | 1024              | Max answer tokens (`num_predict`)                   |
-| `TEMPERATURE`  | 0.7               | Sampling temperature                                |
-| `TOP_P`        | 0.8               | Nucleus sampling cutoff                             |
-| `TOP_K`        | 20                | Top-k sampling cutoff                               |
-| `MIN_P`        | 0.0               | Minimum-probability cutoff                          |
-| `SEED`         | 42                | Sampling seed (repeatable, not bitwise-deterministic) |
+| Constant       | Value           | Meaning                                             |
+| -------------- | --------------- | ---------------------------------------------------- |
+| `MODEL_TAG`    | `granite4:micro` | The Ollama model tag                                |
+| `NUM_CTX`      | 4096            | Context window sent per request (see the pitfall below) |
+| `NUM_PREDICT`  | 512             | Max answer tokens (`num_predict`)                   |
+| `TEMPERATURE`  | 0.0             | Sampling temperature — greedy decoding              |
+| `TOP_P`        | 1.0             | Nucleus sampling cutoff (inert at temperature 0)    |
+| `TOP_K`        | 0               | Top-k sampling cutoff (inert at temperature 0)      |
+| `MIN_P`        | 0.0             | Minimum-probability cutoff (inert at temperature 0) |
+| `SEED`         | 42              | Sampling seed (breaks the rare tie identically)     |
+
+`MODEL_TAG`, `NUM_CTX`, and `NUM_PREDICT` are env-overridable (`LLM_MODEL_TAG`,
+`LLM_NUM_CTX`, `LLM_NUM_PREDICT`) with the pinned value as the default; `make llm-pull`
+derives its tag from the same constant instead of duplicating the string.
+
+**Why greedy decoding.** The Granite model card gives no task-specific sampling guidance,
+and a grounded, citation-bound task wants the single most-likely, reproducible answer over
+sampled variety — not the case for every model family (see the
+[generation-model decision](../roadmap.md#decisions) for the full reasoning). Temperature 0
+makes `top_p`/`top_k`/`min_p` inert; the seed is pinned so the rare tie breaks the same way
+across runs.
 
 ## HTTP contract
 
-Verified 2026-07-17 against `ollama/ollama:0.32.1` and the official API docs
-(`docs.ollama.com/api`, `github.com/ollama/ollama` `docs/api.md`). This section is the
-contract the client is written against; the [theory chapter](../theory/llm-generation.md)
-explains the concepts.
+Verified 2026-07-18 against `ollama/ollama:0.32.1` and the official API docs
+(`docs.ollama.com/api`, `github.com/ollama/ollama` `docs/api.md`), re-confirmed by the
+empirical run in [Verification](#verification) below. This section is the contract the
+client is written against; the [theory chapter](../theory/llm-generation.md) explains the
+concepts.
 
 **Endpoint.** `POST http://{host}:{port}/api/chat`.
 
@@ -67,28 +79,29 @@ explains the concepts.
 
 ```json
 {
-  "model": "qwen3:4b-instruct",
+  "model": "granite4:micro",
   "messages": [
     {"role": "system", "content": "<Prompt.system>"},
     {"role": "user", "content": "<Prompt.user>"}
   ],
   "stream": true,
   "options": {
-    "num_ctx": 8192, "num_predict": 1024, "temperature": 0.7,
-    "top_p": 0.8, "top_k": 20, "min_p": 0.0, "seed": 42
+    "num_ctx": 4096, "num_predict": 512, "temperature": 0.0,
+    "top_p": 1.0, "top_k": 0, "min_p": 0.0, "seed": 42
   }
 }
 ```
 
-The pinned model is non-thinking by design (Qwen3-4B-Instruct-2507), so no `think` field is
-sent. Unknown `options` keys are **silently ignored** by the server, so a typo in an option
-name fails open (no error, no effect) rather than loudly — worth knowing when tuning.
+The pinned model is a plain instruct build (Granite-4.0-Micro emits no reasoning traces),
+so no `think` field is sent. Unknown `options` keys are **silently ignored** by the server,
+so a typo in an option name fails open (no error, no effect) rather than loudly — worth
+knowing when tuning.
 
 **Streaming response.** `application/x-ndjson`: one JSON object per line. Non-final lines
 carry an **incremental** content delta (not the cumulative answer):
 
 ```json
-{"message": {"role": "assistant", "content": "Nach "}, "done": false}
+{"message": {"role": "assistant", "content": "Arsenal "}, "done": false}
 ```
 
 The client forwards each non-empty `message.content` to `on_delta` and accumulates it. The
@@ -97,9 +110,9 @@ in **nanoseconds**; the client divides by 1e9 for `GenerationStats`:
 
 ```json
 {"message": {"role": "assistant", "content": ""}, "done": true,
- "done_reason": "stop", "total_duration": 8710000000, "load_duration": 540000000,
- "prompt_eval_count": 352, "prompt_eval_duration": 5100000000,
- "eval_count": 74, "eval_duration": 3020000000}
+ "done_reason": "stop", "total_duration": 58000000000, "load_duration": 5400000000,
+ "prompt_eval_count": 840, "prompt_eval_duration": 51000000000,
+ "eval_count": 11, "eval_duration": 1600000000}
 ```
 
 `done_reason` is `"stop"` on a normal finish and `"length"` when the answer hit the
@@ -122,18 +135,19 @@ read=None)`): a slow first token is expected, not a failure. `keep_alive` is lef
 Ollama's 5-minute default (the model stays warm between questions in an interactive
 session).
 
-**The `num_ctx` pitfall.** Ollama's default context on CPU is 4096 (a VRAM-tiered default),
-below this prompt's budget. `num_ctx` is therefore sent on **every** request — omitting it
-would silently clip the context. The prompt-size budget that keeps a prompt inside this
-window lives in the [assemble contract](assemble.md); token-exact counting with the served
-tokenizer is deferred (Backlog 7).
+**The `num_ctx` pitfall.** Ollama's context-window default varies by server version, so
+`num_ctx` is sent explicitly on **every** request rather than trusting whatever the server
+happens to default to — omitting it would leave the window at the mercy of that default. The
+prompt-size budget that keeps a prompt inside this window lives in the
+[assemble contract](assemble.md); token-exact counting with the served tokenizer is deferred
+(Backlog 7).
 
 ## Failure behaviour
 
 Every failure raises `GenerateError` with an actionable hint; nothing is retried.
 
 | Situation                        | Message                                                            |
-| -------------------------------- | ------------------------------------------------------------------ |
+| --------------------------------- | ------------------------------------------------------------------ |
 | Server unreachable               | `Ollama not reachable at {base_url}: {error} — run \`make llm\` first` |
 | Model not pulled (HTTP 404)      | `model '{MODEL_TAG}' not found in Ollama — run \`make llm-pull\` first` |
 | Other HTTP error                 | `Ollama request failed with HTTP {status}: {body}`                 |
@@ -143,51 +157,33 @@ Every failure raises `GenerateError` with an actionable hint; nothing is retried
 
 `httpx.ConnectError` and `httpx.ConnectTimeout` map to the unreachable hint; any other
 transport failure — e.g. the server dying under memory pressure while decoding — maps to
-the mid-request hint. Deltas
-already delivered to `on_delta` before a mid-stream failure stay delivered — the caller
-decides how to present a partial answer (`rag.ask` finishes the streamed line before
-printing the error).
+the mid-request hint. Deltas already delivered to `on_delta` before a mid-stream failure
+stay delivered — the caller decides how to present a partial answer (`rag.ask` finishes the
+streamed line before printing the error).
 
 ## Verification
 
-End-to-end spot-check (**2026-07-17**): with the full corpus loaded (1,225 chunks — the
-same-day pipeline re-run recorded in the README status) and the pinned model served by the
-Compose service, five hand-written questions ran through `make ask` on an 8-core / 5.7 GB
-CPU-only machine — below the 16 GB floor; throughput and memory numbers live in the
-[generation-model decision](../roadmap.md#decisions). Four questions with known expected
-§§, one abstention probe (Mietrecht — the corpus holds no BGB):
+End-to-end spot-check (**2026-07-18**), on the **4-core / 8 GB** CPU-only floor, without
+swap: `make llm-pull` pulled `granite4:micro`, then `make ask Q="Which stadium does Arsenal
+play at?"` streamed a grounded, cited English answer —
 
-| Question | Expected | Rank-1 hit (distance) | Answer behaviour |
-| --- | --- | --- | --- |
-| „Wie müssen elektronische Kassen vor Manipulation geschützt werden?" | AO § 146a | **§ 146a AO** (0.4013) | Grounded summary of § 146a's requirements, cited `[1] (§ 146a AO)` |
-| „Wann entsteht die Umsatzsteuer?" | UStG § 13 | **§ 13 UStG** (0.3185) | Grounded per-case enumeration citing `[1]` § 13, `[2]` § 13b, `[5]` § 21 UStG — hit the `num_predict` cap (`done_reason: length`) |
-| „Ist die Würde des Menschen antastbar?" | GG Art 1 | **Art 1, Art 2 GG** (0.4350) | Correct — but the first round re-labelled the norm as „§ 1 Absatz 1 GG" |
-| „Wer ist zum Vorsteuerabzug berechtigt?" | UStG § 15 | **§ 15 UStG** (0.3795; four of five hits are § 15) | First round over-abstained: refused although § 15 Abs. 1 answers the question |
-| „Wann darf mein Vermieter die Miete erhöhen?" (probe) | — not in corpus | § 24 UStG (0.4931 — distant noise) | **Clean abstention**: states the excerpts contain no Mietrecht rules and answers nothing |
+> "Arsenal plays at the Emirates Stadium [3]."
 
-**Prompt refinement (same day).** The first round confirmed grounding and abstention but
-exposed two failure modes — over-abstention and re-labelled citations (Art → §) — plus
-costly over-enumeration. The `SYSTEM_PROMPT` gained the partial-answer,
-verbatim-Fundstelle, and brevity directives (assemble's golden files re-pinned in the same
-change; the [theory chapter](../theory/llm-generation.md) explains each), and the affected
-questions re-ran:
+— with an 840-token prompt, prefill ≈ 51 s and total ≈ 58 s (11 answer tokens). An
+abstention probe, `make ask Q="What is the capital of France?"`, correctly declined:
 
-- Würde: „Nein, die Würde des Menschen ist nicht antastbar. [1] (Art 1 GG)" — verbatim
-  label, one sentence (25 answer tokens, previously 71).
-- Vorsteuerabzug: a partial answer — the Unternehmer with a §§ 14, 14a invoice per
-  `[1] (§ 15 UStG)`, the § 18 UStG constraint for businesses outside the
-  Gemeinschaftsgebiet, and an explicit statement of what the excerpts leave open.
-- Miete probe: still a clean abstention under the softened wording.
+> "the excerpts provided do not contain any information about the capital of France …
+> impossible to answer this question"
 
-**Honest reading.** Retrieval put the expected norm at rank 1 in all four answerable
-cases; the answers are grounded and cited; the probe abstains. This is anecdotal by
-design — no thresholds, no metrics (the RAG triad and rank metrics are Backlog 1), and a
-directive is a request, not a guarantee (runtime groundedness checks are Backlog 9).
-Answer latency on this machine is minutes per question — per-phase numbers and the
-coexistence-memory picture are in the decision entry.
+**Honest reading.** Both runs stayed within the 4-core/8 GB floor without swap —
+prefill-bound, not swap-bound. This is a two-question spot-check, anecdotal by design — no
+thresholds, no metrics (the RAG triad and rank metrics are Backlog 1), and a directive is a
+request, not a guarantee (runtime groundedness checks are Backlog 9). Per-phase timings and
+the full memory picture live in the [generation-model decision](../roadmap.md#decisions).
 
 ## Downstream consumers
 
-[`rag.ask`](../../src/rag/ask/__init__.py) is the only caller: it retrieves, assembles, calls `generate`
-with an `on_delta` that writes to stdout, prints the sources block, and logs the
-`GenerationStats` to stderr.
+[`rag.ask`](../../src/rag/ask/__init__.py) is the only caller: it retrieves, assembles, calls
+`generate` with an `on_delta` that writes to stdout, then prints the numbered sources block
+and a CC BY-SA licence notice for the Wikipedia excerpts, and logs the `GenerationStats` to
+stderr.

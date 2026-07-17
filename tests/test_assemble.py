@@ -16,10 +16,10 @@ from rag.retrieve import RetrievedChunk
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
-# The exact inputs the golden prompt files were generated from (first three kassensichv
+# The exact inputs the golden prompt files were generated from (first three citypark
 # records, in file order, with fixed fake distances). assemble ignores distance, but the
 # values are pinned here so the golden files stay reproducible.
-GOLDEN_QUESTION = "Wie müssen elektronische Kassen gesichert werden?"
+GOLDEN_QUESTION = "Where does City Park play?"
 GOLDEN_DISTANCES = (0.1234, 0.2345, 0.3456)
 
 
@@ -27,9 +27,9 @@ def _chunk(citation: str, text: str, distance: float = 0.0) -> RetrievedChunk:
     """A RetrievedChunk with only the two consumed fields set; the rest are placeholders."""
     return RetrievedChunk(
         id="x#1",
-        source_title="TestG",
+        source_title="Test F.C.",
         citation=citation,
-        source_url="https://example.test/x",
+        source_url="https://en.wikipedia.org/wiki/Test",
         text=text,
         distance=distance,
     )
@@ -39,7 +39,7 @@ def _golden_chunks() -> list[RetrievedChunk]:
     """The first three kassensichv chunks as retrieve would hand them to assemble."""
     records = [
         json.loads(line)
-        for line in (FIXTURES / "chunks" / "kassensichv.jsonl")
+        for line in (FIXTURES / "chunks" / "citypark.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
@@ -60,8 +60,8 @@ def test_assemble_matches_the_golden_prompt() -> None:
     prompt = assemble(GOLDEN_QUESTION, _golden_chunks())
 
     prompts = FIXTURES / "prompts"
-    assert prompt.system == (prompts / "kassensichv_system.txt").read_text(encoding="utf-8")
-    assert prompt.user == (prompts / "kassensichv_user.txt").read_text(encoding="utf-8")
+    assert prompt.system == (prompts / "citypark_system.txt").read_text(encoding="utf-8")
+    assert prompt.user == (prompts / "citypark_user.txt").read_text(encoding="utf-8")
 
 
 def test_assemble_is_deterministic() -> None:
@@ -74,30 +74,30 @@ def test_assemble_is_deterministic() -> None:
 def test_excerpts_are_numbered_in_input_order() -> None:
     # Distances descend, so numbering follows the given order, not the ranking.
     chunks = [
-        _chunk("§ 1 AG", "Erster Auszug.", distance=0.9),
-        _chunk("§ 2 BG", "Zweiter Auszug.", distance=0.5),
-        _chunk("§ 3 CG", "Dritter Auszug.", distance=0.1),
+        _chunk("A F.C. — History", "First excerpt.", distance=0.9),
+        _chunk("B F.C. — Stadium", "Second excerpt.", distance=0.5),
+        _chunk("C F.C. — Honours", "Third excerpt.", distance=0.1),
     ]
 
-    user = assemble("Eine Frage?", chunks).user
+    user = assemble("A question?", chunks).user
 
-    assert "[1] § 1 AG\nErster Auszug." in user
-    assert "[2] § 2 BG\nZweiter Auszug." in user
-    assert "[3] § 3 CG\nDritter Auszug." in user
+    assert "[1] A F.C. — History\nFirst excerpt." in user
+    assert "[2] B F.C. — Stadium\nSecond excerpt." in user
+    assert "[3] C F.C. — Honours\nThird excerpt." in user
     assert user.index("[1]") < user.index("[2]") < user.index("[3]")
-    assert user.endswith("Frage: Eine Frage?")  # question last, no trailing newline
+    assert user.endswith("Question: A question?")  # question last, no trailing newline
 
 
 def test_zero_chunks_is_an_error() -> None:
     with pytest.raises(AssembleError, match="at least one retrieved chunk"):
-        assemble("Eine Frage?", [])
+        assemble("A question?", [])
 
 
 def test_over_budget_prompt_fails_loudly_with_size_and_budget() -> None:
-    oversized = _chunk("§ 1 BigG", "x" * (MAX_PROMPT_CHARS + 1))
+    oversized = _chunk("Big F.C. — History", "x" * (MAX_PROMPT_CHARS + 1))
 
     with pytest.raises(AssembleError) as excinfo:
-        assemble("Eine Frage?", [oversized])
+        assemble("A question?", [oversized])
 
     message = str(excinfo.value)
     assert str(MAX_PROMPT_CHARS) in message  # the budget number

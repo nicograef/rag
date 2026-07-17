@@ -32,26 +32,27 @@ not already surface.
 - **`question`** — the user's question, verbatim.
 - **`chunks`** — retrieve's ranked [`RetrievedChunk`](retrieve.md) list, in ascending-distance
   order. Of each chunk assemble consumes exactly two fields: **`citation`** (the excerpt's
-  label) and **`text`** (the excerpt body). The other fields (`id`, `law`, `source_url`,
-  `distance`) are retrieve's contract for the `ask` step's source list and logging, not for
-  assemble.
+  label, e.g. `Arsenal F.C. — History`) and **`text`** (the excerpt body). The other fields
+  (`id`, `source_title`, `source_url`, `distance`) are retrieve's contract for the `ask` step's
+  source list and logging, not for assemble.
 
 ## Output
 
 A frozen [`Prompt`](../../src/rag/assemble/__init__.py) — two strings for the chat API:
 
-- **`system`** — the fixed German `SYSTEM_PROMPT`: the *groundedness* directive (answer only
+- **`system`** — the fixed English `SYSTEM_PROMPT`: the *groundedness* directive (answer only
   from these excerpts, use no other knowledge), the partial-answer directive (answer what the
   excerpts do cover and name what stays open), the abstention directive (say so plainly when
-  they contain no answer at all — *hallucination prevention*), the German-output and brevity
-  directives (answer tokens are the slowest CPU resource), and the citation format
-  `[n] (Fundstelle)` with the Fundstelle taken verbatim from the excerpt label. Identical on
-  every call; wording last refined against real model behaviour 2026-07-17 (see the
-  [generate contract's verification](generate.md#verification)).
+  they contain no answer at all — *hallucination prevention*), a brevity directive (answer
+  tokens are the slowest CPU resource), the verbatim citation format `[n] (citation)` — e.g.
+  `[1] (Arsenal F.C. — History)` — and a **CC BY-SA attribution** directive: the excerpts are
+  Wikipedia text licensed CC BY-SA 4.0, so every fact the answer surfaces must be attributed to
+  its source article through that citation. Identical on every call; verified against real
+  model behaviour 2026-07-18 (see the [generate contract's verification](generate.md#verification)).
 - **`user`** — the numbered excerpts in rank order, the question last:
 
 ```
-Auszüge aus Gesetzestexten:
+Sources:
 
 [1] {citation}
 {text}
@@ -59,12 +60,12 @@ Auszüge aus Gesetzestexten:
 [2] {citation}
 {text}
 
-Frage: {question}
+Question: {question}
 ```
 
 Excerpts are numbered `[1]..[n]` in the order given (not re-sorted), blocks are joined by a
 blank line, and there is no trailing newline. Everything static — the system prompt and the
-excerpt prefix — comes first and the per-question part comes last, so the served model can
+`Sources:` prefix — comes first and the per-question part comes last, so the served model can
 reuse the computed prefix across questions ([prompt caching / KV
 caching](../theory/llm-generation.md) — named here, explained there). Re-ordering the
 excerpts against the *lost-in-the-middle* effect stays out of scope (Backlog 7).
@@ -86,19 +87,18 @@ shortened one. The cap is character-based, a conservative stand-in for token-exa
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `NUM_CTX` | 8192 | the pinned model's context window (imported from generate) |
-| `GENERATION_RESERVE_TOKENS` | 1024 | `= NUM_PREDICT`; the answer must fit in `num_ctx` too |
-| `CHARS_PER_TOKEN_FLOOR` | 2.5 | chars per token, pinned one notch under the measured floor |
-| `MAX_PROMPT_CHARS` | 17920 | `int((NUM_CTX − reserve) × floor)`; the cap on `len(system) + len(user)` |
+| `NUM_CTX` | 4096 | the pinned model's context window (imported from generate) |
+| `GENERATION_RESERVE_TOKENS` | 512 | `= NUM_PREDICT`; the answer must fit in `num_ctx` too |
+| `CHARS_PER_TOKEN_FLOOR` | 2.3 | chars per token, pinned one notch under the measured floor |
+| `MAX_PROMPT_CHARS` | 8243 | `int((NUM_CTX − reserve) × floor)`; the cap on `len(system) + len(user)` |
 
-**Why 2.5 (measured 2026-07-17).** All 1,225 corpus chunks tokenized with the served model's
-own tokenizer (Qwen3-4B-Instruct-2507) span min 13 / median 352 / max 4,717 tokens; the
-densest chunk — the atomic 13,011-char UStG „Anlage 2" table — packs 2.758 chars/token. Near
-the budget boundary a prompt is dominated by such large chunks, whose lowest measured ratio
-is that 2.758, so pinning the floor one notch under it (2.5) keeps the character cap a safe
-under-estimate of the real token count. Token-exact counting with the served tokenizer is
-deliberately Backlog 7 — this guard is the MVP stand-in, tuned to fail safe rather than to
-pack the window maximally.
+**Why 2.3 (measured 2026-07-18).** The corpus tokenized with the served model's own tokenizer
+(granite-4.0-micro) runs the densest chunk at ≈ 2.31 chars/token; pinning the floor one notch
+under it (2.3) keeps the character cap a safe under-estimate of the real token count even in
+that worst case. A realistic top-5 prompt is ≈ 1,040 tokens — far under the 3,584-token budget
+(`NUM_CTX` minus `NUM_PREDICT`) — so the guard trips only on genuinely oversized inputs.
+Token-exact counting with the served tokenizer is deliberately Backlog 7 — this guard is the
+MVP stand-in, tuned to fail safe rather than to pack the window maximally.
 
 ## Failure behaviour
 
@@ -108,9 +108,8 @@ pack the window maximally.
   nothing to ground on is meaningless; retrieve returning zero rows already fails upstream
   with its own hint, so this guards direct callers.
 - **Over budget** — the message names the actual size, the budget, its derivation, and the
-  fix, e.g. `prompt is 21234 characters, over the 17920-character context budget (8192
-  num_ctx minus 1024 answer-reserve tokens at 2.5 chars/token) — retry with a smaller
-  --top-k`.
+  fix, e.g. `prompt is 9000 characters, over the 8243-character context budget (4096 num_ctx
+  minus 512 answer-reserve tokens at 2.3 chars/token) — retry with a smaller --top-k`.
 
 Both are raised before a `Prompt` is returned; assemble has no partial output.
 
@@ -119,8 +118,9 @@ Both are raised before a `Prompt` is returned; assemble has no partial output.
 Retrieved chunks enter the user message **verbatim** — a chunk whose text happened to contain
 instruction-like phrasing ("ignore the above and …") would be passed through unchanged. Input,
 retrieval, and output rails against *prompt injection* are deliberately not built here: they
-are Backlog 9. At MVP the corpus is trusted (impersonal German norm texts from a public-domain
-source), and the grounding and abstention directives in the system prompt are the only rail.
+are Backlog 9. At MVP the corpus is trusted (English Wikipedia article text, fetched read-only
+from the MediaWiki API), and the grounding and abstention directives in the system prompt are
+the only rail.
 
 ## Downstream consumers
 

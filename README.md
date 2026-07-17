@@ -34,13 +34,14 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-> **Corpus pivot in progress (fetch → load verified 2026-07-17):** the offline pipeline —
-> **fetch**, **convert**, **chunk**, **embed** (`BAAI/bge-small-en-v1.5`, dim 384), and
-> **load** (`vector(384)`) — now builds an **English Wikipedia** corpus (the 20 current
-> Premier League clubs, `clubs.toml`): a full `make fetch` → `make load` run indexed 1,333
-> chunks, and `make query` returns plausible club sections by cosine distance. Only the
-> **online path** (assemble, generate) still runs on the previous stack, so the quick-start
-> figures and corpus framing below lag until the wrap-up slice re-verifies the whole loop.
+> **Corpus pivot — whole loop verified 2026-07-18:** the pipeline now runs end to end on an
+> **English Wikipedia** corpus (the 20 current Premier League clubs, `clubs.toml`) — **fetch**,
+> **convert**, **chunk**, **embed** (`BAAI/bge-small-en-v1.5`, dim 384), **load**
+> (`vector(384)`), and the online path (**assemble**, **generate** on `granite4:micro`). A full
+> `make fetch` → `make load` run indexed 1,333 chunks, and `make ask "Which stadium does
+> Arsenal play at?"` answers *"Arsenal plays at the Emirates Stadium"* with a numbered `Sources:`
+> block and a CC BY-SA notice. The wrap-up slice re-verifies the whole loop from a clean
+> checkout on the 4-core/8 GB floor and finishes the positioning/corpus prose below.
 
 Quick start last verified from a clean checkout: **2026-07-14** — every step below as
 written: dev setup, `make db` including the image pull, `make check`, the full pipeline
@@ -67,15 +68,15 @@ bash scripts/setup-dev-tools.sh   # install uv + sync Python dependencies (idemp
 cp .env.example .env              # then fill in POSTGRES_PASSWORD
 make db                           # start Postgres 17 + pgvector (Docker Compose)
 make check                        # lint + types + tests
-make fetch                        # download the law XML (~0.4 MB) into data/raw/
-make convert                      # convert it into Markdown under data/corpus/
+make fetch                        # download the 20 club articles into data/raw/
+make convert                      # convert them into Markdown under data/corpus/
 make chunk                        # slice the corpus into JSONL chunks under data/chunks/
-make embed                        # embed the chunks (first run downloads the model, ~4.6 GB)
+make embed                        # embed the chunks (first run downloads the model, ~130 MB)
 make load                         # fill the chunks table + HNSW index in Postgres
-make query Q="Wie müssen elektronische Kassen gesichert werden?"   # retrieval-only check (the retrieve stage)
+make query Q="Which stadium does Arsenal play at?"   # retrieval-only check (the retrieve stage)
 make llm                          # start Ollama (Docker Compose)
-make llm-pull                     # pull the pinned LLM (~2.5 GB) into the model volume
-make ask Q="Wann entsteht die Umsatzsteuer?"   # grounded answer with § citations (CPU: expect minutes)
+make llm-pull                     # pull the pinned LLM (~2.1 GB) into the model volume
+make ask Q="Which stadium does Arsenal play at?"   # grounded answer with citations (CPU: ~1 min)
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
@@ -89,9 +90,9 @@ one-time ~160 MB (compressed) pull of the
 `pgvector/pgvector:pg17` image, ~0.4 MB zipped (~1.8 MB extracted) of law XML for the
 four-law MVP corpus, and a one-time **~130 MB download of the pinned embedding model**
 (`BAAI/bge-small-en-v1.5`) into `~/.cache/huggingface/` on the first `make embed` (measured
-2026-07-17; details in the [model decision](docs/roadmap.md#decisions)). **Phase 4 adds** (measured
-2026-07-17): a one-time pull of the pinned `ollama/ollama:0.32.1` image (≈ 8 GB on
-disk) and a one-time **~2.5 GB download of the pinned LLM** (`qwen3:4b-instruct`,
+2026-07-17; details in the [model decision](docs/roadmap.md#decisions)). The online path adds (measured
+2026-07-18): a one-time pull of the pinned `ollama/ollama:0.32.1` image (≈ 8 GB on
+disk) and a one-time **~2.1 GB download of the pinned LLM** (`granite4:micro`,
 4-bit GGUF) into the named Docker volume on the first `make llm-pull`.
 
 ## Pipeline overview
