@@ -19,13 +19,18 @@ class FakeEmbedder:
     default suite never loads torch, downloads a model, or touches the network. The vectors
     are meaningless as semantics — they only exercise the stages' plumbing. `dim` defaults
     to a readable 8 for golden files; the load integration tests pass the schema's real
-    dimension instead.
+    dimension instead. "Tokens" are whitespace words; `max_tokens` defaults high enough
+    that only the token-guard tests, which pass a tiny limit, ever trip it.
     """
 
     model = "fake-embedder"
 
-    def __init__(self, dim: int = 8) -> None:
+    def __init__(self, dim: int = 8, max_tokens: int = 8192) -> None:
         self.dim = dim
+        self.max_tokens = max_tokens
+
+    def token_count(self, text: str) -> int:
+        return len(text.split())
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         return [self._vector(text) for text in texts]

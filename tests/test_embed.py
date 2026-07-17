@@ -58,6 +58,22 @@ def test_invalid_chunk_record_raises(tmp_path: Path) -> None:
         embed_law(chunks_file, tmp_path / "embeddings", FakeEmbedder())
 
 
+def test_a_chunk_over_the_token_window_fails_before_writing(tmp_path: Path) -> None:
+    # FakeEmbedder counts whitespace words as tokens; five words is over the max of three.
+    chunks_file = tmp_path / "over.jsonl"
+    chunks_file.write_text(
+        json.dumps({"id": "x#§ 1", "text": "ein zwei drei vier fünf"}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    embeddings_dir = tmp_path / "embeddings"
+
+    with pytest.raises(EmbedError, match="refusing to silently truncate") as excinfo:
+        embed_law(chunks_file, embeddings_dir, FakeEmbedder(max_tokens=3))
+
+    assert "x#§ 1" in str(excinfo.value)
+    assert not (embeddings_dir / "over.jsonl").exists()  # nothing written on failure
+
+
 def test_main_isolates_a_failing_law_from_the_others(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

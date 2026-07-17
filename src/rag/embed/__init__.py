@@ -6,8 +6,10 @@ record per chunk (``id``, ``model``, ``dim``, ``embedding``), input order preser
 chunk fields ``id`` and ``text`` are consumed. The model is hidden behind the minimal
 ``Embedder`` interface; the one real implementation wraps the pinned model with batch
 encoding on CPU (sentence-transformers is imported lazily so the default test suite never
-loads torch). Reproducible within tolerance — never bitwise (floating-point results vary
-across hardware and library versions).
+loads torch). A chunk longer than the model's token window fails the law instead of being
+silently truncated — the no-silent-loss guarantee holds across the chunk→embed boundary.
+Reproducible within tolerance — never bitwise (floating-point results vary across hardware
+and library versions).
 
 Stage contract: docs/stages/embed.md
 Theory: docs/theory/embeddings.md
@@ -19,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
-from rag import CHUNKS_DIR, EMBEDDINGS_DIR
+from rag import CHUNKS_DIR, EMBEDDINGS_DIR, run_per_law
 
 # Pinned by the dated model decision in docs/roadmap.md ("Embedding model", 2026-07-14):
 # model, normalization, and pgvector distance operator are chosen together — the reasoning
@@ -41,10 +43,17 @@ class Embedder(Protocol):
 
     ``model`` and ``dim`` describe every vector ``embed`` returns; the embed stage stamps
     them onto each artifact record so load can validate consistency before writing.
+    ``max_tokens`` and ``token_count`` let the stage refuse a text the model would
+    silently truncate instead of embedding it lossily.
     """
 
     model: str
     dim: int
+    max_tokens: int
+
+    def token_count(self, text: str) -> int:
+        """The number of tokens ``embed`` would feed the model for ``text``."""
+        ...
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Return one vector per input text, in input order."""
@@ -61,6 +70,16 @@ class SentenceTransformerEmbedder:
         self._model = SentenceTransformer(MODEL_ID, device="cpu")
         self.model = MODEL_ID
         self.dim = EMBEDDING_DIM
+        # Declared optional upstream; without a window the truncation guard cannot exist.
+        max_seq_length = self._model.max_seq_length
+        if max_seq_length is None:
+            raise EmbedError(f"{MODEL_ID} reports no max_seq_length — cannot guard truncation")
+        self.max_tokens = max_seq_length
+
+    def token_count(self, text: str) -> int:
+        # The raw tokenizer, not `self._model.tokenize` — the latter already truncates to
+        # `max_seq_length`, which would hide exactly the overflow this count exists to catch.
+        return len(self._model.tokenizer(text, truncation=False)["input_ids"])
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vectors = self._model.encode(
@@ -87,10 +106,17 @@ def embed_law(chunks_file: Path, embeddings_dir: Path, embedder: Embedder) -> Pa
     """Embed one ``data/chunks/<slug>.jsonl`` into ``embeddings_dir/<slug>.jsonl``.
 
     One self-describing record per chunk — ``id``, ``model``, ``dim``, ``embedding`` —
-    in chunk-file order. The output file is only written after the whole law embedded
-    successfully.
+    in chunk-file order. A chunk over the model's token window fails the law before
+    anything is embedded (``encode`` would silently truncate it); the output file is only
+    written after the whole law embedded successfully.
     """
     pairs = read_chunk_texts(chunks_file)
+    for chunk_id, text in pairs:
+        if (tokens := embedder.token_count(text)) > embedder.max_tokens:
+            raise EmbedError(
+                f"chunk {chunk_id} is {tokens} tokens, over the model's {embedder.max_tokens}"
+                " — refusing to silently truncate normative text"
+            )
     vectors = embedder.embed([text for _, text in pairs])
     if len(vectors) != len(pairs):
         raise EmbedError(f"embedder returned {len(vectors)} vectors for {len(pairs)} chunks")
@@ -130,16 +156,13 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
     if embedder is None:
         embedder = SentenceTransformerEmbedder()
 
-    failed: list[str] = []
-    for chunks_file in chunks_files:
-        try:
-            output = embed_law(chunks_file, args.embeddings_dir, embedder)
-        except (EmbedError, OSError) as error:
-            print(f"✗ {chunks_file.stem}: {error}", file=sys.stderr)
-            failed.append(chunks_file.stem)
-        else:
-            print(f"✓ {chunks_file.stem} → {output}")
-    if failed:
-        print(f"embed failed for: {', '.join(failed)}", file=sys.stderr)
-        return 1
-    return 0
+    jobs = [
+        (
+            chunks_file.stem,
+            lambda chunks_file=chunks_file, embedder=embedder: (
+                f"→ {embed_law(chunks_file, args.embeddings_dir, embedder)}"
+            ),
+        )
+        for chunks_file in chunks_files
+    ]
+    return run_per_law("embed", jobs, (EmbedError, OSError))

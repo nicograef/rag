@@ -60,11 +60,17 @@ plain JSON lines, not a binary matrix.
   successfully.
 - **No partial reads.** An invalid chunk record (broken JSON, missing `id`/`text`) fails
   the law instead of silently skipping the line.
+- **No silent truncation.** A chunk whose text exceeds the model's token window (8192 for
+  the pinned model) fails the law — naming the chunk id — before anything is embedded,
+  instead of letting the encoder silently cut it off. This extends the chunk stage's
+  no-silent-loss guarantee across the chunk→embed boundary; it matters for the one chunk
+  class chunking deliberately leaves over-size, [atomic tables](chunk.md#guarantees).
 
 ## Failure behaviour
 
-Per-law isolation, like the earlier stages: a law that cannot be embedded is reported on
-stderr (`✗ <slug>: <error>`) and produces no output file; the remaining laws still embed.
+Per-law isolation, like the earlier stages: a law that cannot be embedded — an invalid
+chunk record, or a chunk over the model's token window — is reported on stderr
+(`✗ <slug>: <error>`) and produces no output file; the remaining laws still embed.
 The exit code is non-zero if any law failed. When `--chunks-dir` is missing or empty,
 embed exits non-zero with a hint to run `make chunk` first.
 
