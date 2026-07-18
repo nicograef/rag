@@ -41,19 +41,16 @@ HEALTH_TIMEOUT_SECONDS = 2.0
 # The single-page UI served at GET /, resolved relative to this module so `make serve` finds it.
 STATIC_DIR = Path(__file__).parent / "static"
 
+# Upper bound on the client-supplied top_k: the corpus is a few thousand chunks and /ask
+# self-limits on the prompt budget, so this only caps a pathological /search request.
+MAX_TOP_K = 50
+
 
 class AskRequest(BaseModel):
-    """The ``/ask`` and ``/search`` request body: a question and how many chunks to retrieve."""
+    """The shared ``/ask`` and ``/search`` request body: a question and how many chunks to retrieve."""
 
     question: str
-    top_k: int = Field(default=TOP_K, ge=1)
-
-
-class SearchRequest(BaseModel):
-    """The ``/search`` request body (same shape as :class:`AskRequest`, kept separate by intent)."""
-
-    question: str
-    top_k: int = Field(default=TOP_K, ge=1)
+    top_k: int = Field(default=TOP_K, ge=1, le=MAX_TOP_K)
 
 
 class Source(BaseModel):
@@ -217,7 +214,7 @@ def create_app(
         )
 
     @app.post("/search")
-    def search(request: SearchRequest, http_request: Request) -> SearchResponse:
+    def search(request: AskRequest, http_request: Request) -> SearchResponse:
         try:
             hits = http_request.app.state.retrieve_fn(request.question, request.top_k)
         except RetrieveError as error:

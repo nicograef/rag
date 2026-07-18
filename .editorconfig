@@ -10,10 +10,6 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# Go – gofmt enforces tabs (future backend)
-[*.go]
-indent_style = tab
-
 # Python – 4-space convention (ruff format default)
 [*.py]
 indent_size = 4

@@ -54,11 +54,11 @@ distances) is the instrument that makes a retrieval improvement from (a) visible
   - `POST /ask` → `AskResponse { answer, sources: [Source], stats }` — the full RAG answer.
   - `POST /search` → `SearchResponse { hits: [Hit] }` — retrieval only, with `distance` + `text`.
   - `GET /` → the static `index.html` (Slice 2).
-- **Schemas** (Pydantic v2): `AskRequest { question, top_k=TOP_K }`,
-  `SearchRequest { question, top_k=TOP_K }`, `Source { n, citation, source_title, source_url }`,
+- **Schemas** (Pydantic v2): `AskRequest { question, top_k=TOP_K }` — the shared `/ask` and
+  `/search` request body — `Source { n, citation, source_title, source_url }`,
   `Hit { n, citation, source_title, source_url, distance, text }`,
   `GenerationStatsOut` mirrors `rag.generate.GenerationStats`. `TOP_K` is the existing
-  `rag.retrieve.TOP_K` (5); `top_k` validated `>= 1`.
+  `rag.retrieve.TOP_K` (5); `top_k` validated `1 <= top_k <= MAX_TOP_K` (50).
 - **Error mapping**: `RetrieveError` → 503, `AssembleError` → 422, `GenerateError` → 503,
   invalid body / `top_k < 1` → 422 (Pydantic).
 - **Endpoints are sync `def`**: FastAPI runs them in its threadpool, so the CPU embed, the

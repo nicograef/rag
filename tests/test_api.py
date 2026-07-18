@@ -156,6 +156,15 @@ def test_ask_rejects_non_positive_top_k_with_422() -> None:
     assert response.status_code == 422  # Pydantic ge=1, before any stage runs
 
 
+def test_ask_rejects_top_k_over_the_cap_with_422() -> None:
+    from rag.api import MAX_TOP_K
+
+    with _client() as client:
+        response = client.post("/ask", json={"question": "q", "top_k": MAX_TOP_K + 1})
+
+    assert response.status_code == 422  # Pydantic le=MAX_TOP_K, before any stage runs
+
+
 def test_ask_retrieve_error_maps_to_503() -> None:
     error = RetrieveError("the chunks table is empty — run `make load` first")
     with _client(retrieve_fn=_retrieve_raising(error)) as client:
