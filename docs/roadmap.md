@@ -388,3 +388,29 @@ CC BY-SA 4.0, properly licensed for the playbook's gitignored, runtime-fetched u
   *paraphrase* is "adapted material" is legally unsettled; the attribution posture
   neutralizes it. If a future source's terms are less clear, it does not enter the corpus
   (rule: never ingest sources with unclear licensing).
+
+**Learner-facing web app — Python + plain HTML (track b)** (decided 2026-07-18): a small
+persistent web surface to *experience* the pipeline, pulled ahead of the backlog as tooling.
+
+- **Context:** the playbook has two kinds of work — **(a)** the RAG learning content (the
+  numbered backlog: evaluation, hybrid search, reranking, …) and **(b)** the surroundings that
+  make the system experienceable for a learner. Building a minimal (b) first makes the effect
+  of each later (a) change visible as a user; a persistent process also keeps the embedding
+  model warm in memory (the CLIs reload it per `make ask`/`make query`), and a retrieval view
+  (`/search` — ranked chunks with distances) is the instrument that shows a retrieval change
+  at a glance.
+- **Choice:** build (b) now as a **minimal** app — a **Python + FastAPI** backend (single
+  uvicorn worker, warm embedder constructed once in a lifespan) exposing `/health`, `/ask`, and
+  `/search`, plus a single static **plain-HTML + vanilla-JS** page (no React, no build step)
+  served at `/`. This supersedes the earlier "Go backend, React frontend" intent for the near
+  term; a richer React frontend (the full chat app, Backlog #15) stays a later option. Plan:
+  [plan-python-backend.md](plans/plan-python-backend.md).
+- **Deliberate exception to rule 5's definition of done:** (b) is *tooling*, not a numbered
+  learning phase, so it is exempt from the theory-chapter / stage-contract / concept-map DoD —
+  it carries code + tests + this decision + the README status line only. The core (a) backlog
+  keeps the full DoD.
+- **Consequences:** new dependencies `fastapi` + `uvicorn`; `make serve` runs the app on the
+  host (not containerized — deployment-time dockerization stays deferred); the app binds
+  `127.0.0.1`, single user, unauthenticated by design; token streaming (SSE), auth, CORS, and
+  a connection pool are out of scope. The [AGENTS.md](../AGENTS.md) tech-stack row and rule 4
+  are updated to match.

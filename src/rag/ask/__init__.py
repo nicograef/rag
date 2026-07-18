@@ -16,6 +16,7 @@ Theory: docs/theory/llm-generation.md
 import argparse
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from rag.assemble import AssembleError, Prompt, assemble
 from rag.embed import Embedder, SentenceTransformerEmbedder
@@ -39,11 +40,25 @@ RetrieveFn = Callable[[str, int], list[RetrievedChunk]]
 GenerateFn = Callable[[Prompt, Callable[[str], None]], GenerateResult]
 
 
-def _default_retrieve_fn(embedder: Embedder | None) -> RetrieveFn:
+@dataclass(frozen=True)
+class Answer:
+    """The online path's structured result: the answer, the chunks it cited, and the run's stats.
+
+    What :func:`answer_question` returns and both callers surface — the CLI prints it, the HTTP
+    API serialises it.
+    """
+
+    answer: str
+    hits: list[RetrievedChunk]
+    stats: GenerationStats
+
+
+def default_retrieve_fn(embedder: Embedder | None) -> RetrieveFn:
     """Wrap ``rag.retrieve.retrieve``, building the real embedder lazily when none was injected.
 
     The connection settings are checked before the model construction: missing settings
-    should fail in milliseconds, not after seconds of loading the embedding model.
+    should fail in milliseconds, not after seconds of loading the embedding model. Shared by
+    the CLI (lazy construction per run) and the API (a warm embedder passed in once).
     """
 
     def retrieve_top_k(question: str, top_k: int) -> list[RetrievedChunk]:
@@ -54,9 +69,42 @@ def _default_retrieve_fn(embedder: Embedder | None) -> RetrieveFn:
     return retrieve_top_k
 
 
-def _generate_via_ollama(prompt: Prompt, on_delta: Callable[[str], None]) -> GenerateResult:
+def generate_via_ollama(prompt: Prompt, on_delta: Callable[[str], None]) -> GenerateResult:
     """Default ``generate_fn``: forward to ``rag.generate.generate`` with the live callback."""
     return generate(prompt, on_delta=on_delta)
+
+
+def _discard_delta(_delta: str) -> None:
+    """Default ``on_delta`` for a non-streaming caller (the API): drop each token."""
+
+
+def answer_question(
+    question: str,
+    top_k: int,
+    *,
+    retrieve_fn: RetrieveFn,
+    generate_fn: GenerateFn,
+    on_delta: Callable[[str], None] = _discard_delta,
+    on_retrieved: Callable[[list[RetrievedChunk]], None] | None = None,
+    on_assembled: Callable[[Prompt], None] | None = None,
+) -> Answer:
+    """Run retrieve → assemble → generate once and return the structured :class:`Answer`.
+
+    The single online-path wiring shared by the CLI (``ask.main``) and the HTTP API. Stage
+    errors propagate unchanged — ``RetrieveError``, ``AssembleError``, ``GenerateError`` — for
+    the caller to map to an exit code or an HTTP status. The optional hooks observe the
+    intermediate steps without altering the flow: ``on_retrieved`` after retrieval,
+    ``on_assembled`` after prompt assembly, and ``on_delta`` per streamed answer token. The
+    CLI passes all three (its live streaming and per-step stderr log); the API passes none.
+    """
+    hits = retrieve_fn(question, top_k)
+    if on_retrieved is not None:
+        on_retrieved(hits)
+    prompt = assemble(question, hits)
+    if on_assembled is not None:
+        on_assembled(prompt)
+    result = generate_fn(prompt, on_delta)
+    return Answer(answer=result.answer, hits=list(hits), stats=result.stats)
 
 
 def _log_prompt(prompt: Prompt, *, verbose: bool) -> None:
@@ -114,26 +162,11 @@ def main(
         parser.error("--top-k must be at least 1")
 
     if retrieve_fn is None:
-        retrieve_fn = _default_retrieve_fn(embedder)
+        retrieve_fn = default_retrieve_fn(embedder)
     if generate_fn is None:
-        generate_fn = _generate_via_ollama
+        generate_fn = generate_via_ollama
 
     print(f"question: {args.question}", file=sys.stderr)
-
-    try:
-        hits = retrieve_fn(args.question, args.top_k)
-    except RetrieveError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-    for rank, hit in enumerate(hits, start=1):
-        print(f"hit {rank}: ({hit.distance:.4f}) {hit.citation}", file=sys.stderr)
-
-    try:
-        prompt = assemble(args.question, hits)
-    except AssembleError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-    _log_prompt(prompt, verbose=args.verbose)
 
     streamed: list[str] = []
 
@@ -141,8 +174,26 @@ def main(
         print(delta, end="", flush=True)
         streamed.append(delta)
 
+    def on_retrieved(hits: list[RetrievedChunk]) -> None:
+        for rank, hit in enumerate(hits, start=1):
+            print(f"hit {rank}: ({hit.distance:.4f}) {hit.citation}", file=sys.stderr)
+
+    def on_assembled(prompt: Prompt) -> None:
+        _log_prompt(prompt, verbose=args.verbose)
+
     try:
-        result = generate_fn(prompt, on_delta)
+        answer = answer_question(
+            args.question,
+            args.top_k,
+            retrieve_fn=retrieve_fn,
+            generate_fn=generate_fn,
+            on_delta=on_delta,
+            on_retrieved=on_retrieved,
+            on_assembled=on_assembled,
+        )
+    except (RetrieveError, AssembleError) as error:
+        print(str(error), file=sys.stderr)
+        return 1
     except GenerateError as error:
         if streamed:
             print()  # close the partial answer line before the hint goes to stderr
@@ -154,10 +205,10 @@ def main(
     print()
     print()
     print("Sources:")
-    for number, hit in enumerate(hits, start=1):
+    for number, hit in enumerate(answer.hits, start=1):
         print(f"[{number}] {hit.citation} — {hit.source_url}")
     print()
     print(LICENCE_NOTICE)
 
-    _log_stats(result.stats)
+    _log_stats(answer.stats)
     return 0

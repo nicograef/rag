@@ -27,7 +27,7 @@ phased plan and all recorded decisions;
 | Embeddings | sentence-transformers, CPU-only — `BAAI/bge-small-en-v1.5`, dim 384 (pinned 2026-07-17) |
 | LLM        | Ollama serving `granite4:micro` GGUF (CPU) — pinned 2026-07-18    |
 | Corpus     | English Wikipedia (20 Premier League clubs), CC BY-SA 4.0 → Markdown |
-| Future app | Go backend, React frontend (not started — pipeline first)         |
+| Web app (b) | Python + FastAPI backend, plain-HTML/JS learner UI (minimal — see roadmap) |
 
 Target runtime for everything: a 4-core / 8 GB **CPU-only** machine (no GPU).
 
@@ -93,7 +93,8 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
    English Wikipedia article text is CC BY-SA 4.0 (verified 2026-07-17) — properly licensed,
    used under attribution: the corpus is gitignored and fetched at runtime (no copyleft
    attaches to the repo), and displayed excerpts carry the article link plus a licence notice.
-4. **Python for all pipeline code.** Go/React are reserved for the future web app.
+4. **Python for all pipeline code** and the learner-facing web app (FastAPI backend + plain
+   HTML/JS UI, track (b)). A richer React frontend remains a later option, not built yet.
 5. **One feature at a time** — follow [docs/roadmap.md](docs/roadmap.md) phase by phase;
    never skip ahead or bundle phases. **Definition of done** for every future roadmap
    phase: code + tests + theory chapter + documented stage contract + updated README

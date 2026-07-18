@@ -40,6 +40,13 @@ query:         ## Verify retrieval: make query Q="<question>" (top-k similarity 
 ask:           ## Ask a question: make ask Q="<question>" (retrieve → assemble → generate)
 	uv run python -m rag.ask "$(Q)"
 
+# ── Web app (learner UI) ──
+
+.PHONY: serve
+
+serve:         ## Start the learner web app (FastAPI + UI) on API_HOST:API_PORT
+	uv run python -m rag.api
+
 # ── Code Quality ──
 
 .PHONY: check lint fmt typecheck test
