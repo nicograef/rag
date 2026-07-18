@@ -208,6 +208,15 @@ def test_search_retrieve_error_maps_to_503() -> None:
     assert "make db" in response.json()["detail"]
 
 
+def test_index_serves_the_single_page_ui() -> None:
+    with _client() as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "RAG Playbook" in response.text
+
+
 def test_composition_seam_matches_the_cli_for_the_same_fakes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

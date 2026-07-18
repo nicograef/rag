@@ -7,16 +7,19 @@ embedding model **once** at startup and keeps it warm — the reason a persisten
 exists at all, since the CLIs (``make ask``/``make query``) reload the model per run. Three
 JSON endpoints reuse that warm model: ``/health`` (readiness), ``/ask`` (the full grounded
 answer), and ``/search`` (retrieval only — ranked chunks with distances, the instrument that
-makes a retrieval change visible). The static single-page UI lands at ``/`` in a later slice.
-No theory chapter by design: this is tooling, not a learning building block.
+makes a retrieval change visible). The static single-page UI (one self-contained HTML file
+with inline CSS/JS) is served at ``/``. No theory chapter by design: this is tooling, not a
+learning building block.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from rag.ask import (
@@ -34,6 +37,9 @@ from rag.retrieve import TOP_K, RetrieveError, check_connection_settings
 # /health is a readiness probe, not a place to block on a slow dependency, so its live checks
 # use a short timeout.
 HEALTH_TIMEOUT_SECONDS = 2.0
+
+# The single-page UI served at GET /, resolved relative to this module so `make serve` finds it.
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 class AskRequest(BaseModel):
@@ -165,6 +171,11 @@ def create_app(
         yield
 
     app = FastAPI(title="RAG Playbook", lifespan=lifespan)
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        """Serve the single-page learner UI."""
+        return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/health")
     def health(request: Request) -> HealthResponse:

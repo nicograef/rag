@@ -48,7 +48,8 @@ in the [roadmap](docs/roadmap.md).
 ## Quick start
 
 What runs today (Phases 0–4): the dev setup, the checks, the database, the whole
-offline ingestion pipeline, and the online question-answering loop.
+offline ingestion pipeline, the online question-answering loop, and a minimal
+learner web app (`make serve`) that puts it in a browser.
 
 ```bash
 bash scripts/setup-dev-tools.sh   # install uv + sync Python dependencies (idempotent)
@@ -64,6 +65,7 @@ make query Q="Which stadium does Arsenal play at?"   # retrieval-only check (the
 make llm                          # start Ollama (Docker Compose)
 make llm-pull                     # pull the pinned LLM (~2.1 GB) into the model volume
 make ask Q="Which stadium does Arsenal play at?"   # grounded answer with citations (CPU: ~1 min)
+make serve                        # open the web UI at http://127.0.0.1:8000 (question box + retrieval view)
 ```
 
 Run `make help` for all targets. Requirements: Linux/macOS with `curl`, Docker with the
