@@ -36,7 +36,7 @@ def _chunk(citation: str, text: str, distance: float = 0.0) -> RetrievedChunk:
 
 
 def _golden_chunks() -> list[RetrievedChunk]:
-    """The first three kassensichv chunks as retrieve would hand them to assemble."""
+    """The first three citypark chunks as retrieve would hand them to assemble."""
     records = [
         json.loads(line)
         for line in (FIXTURES / "chunks" / "citypark.jsonl")

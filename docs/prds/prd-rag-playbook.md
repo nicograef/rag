@@ -60,8 +60,8 @@ documented commands (the first run downloads several gigabytes of model weights 
 documented up front), watch a real corpus flow stage by stage into a database, ask a
 question in the terminal, and get a grounded answer with citations — and at every stage,
 read why it works the way it does. Until then, the README status table says exactly which
-chapters exist today, and the documented stage contracts state what swapping in your own
-corpus actually requires.
+chapters exist today, and the documented stage contracts state what swapping in the
+learner's own corpus actually requires.
 
 ## User Stories
 

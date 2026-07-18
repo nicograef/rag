@@ -6,7 +6,7 @@
 
 Stand up a small, long-lived **Python HTTP backend** that serves the existing online path
 (retrieve → assemble → generate) over HTTP, with the embedding model **loaded once at
-startup and kept in-process** (the CLI reloads bge-m3 on every `make ask`/`make query`).
+startup and kept in-process** (the CLI reloads bge-small-en-v1.5 on every `make ask`/`make query`).
 The backend becomes the substrate for the future React chat UI and for inspecting
 retrieval/evaluation quality in a browser as later backlog items land.
 
@@ -60,8 +60,9 @@ Durable decisions that apply across all phases:
   constructed **once** in a FastAPI lifespan handler and stored on app state; every request
   reuses it. A retrieve function bound to that warm embedder (reusing the wiring in
   `rag.ask._default_retrieve_fn`) is built once at startup and reused per request.
-- **Single worker**: uvicorn runs **one worker**. The 2.2 GB model lives in-process;
-  multiple workers would each load their own copy and blow the 16 GB budget. No `--reload`
+- **Single worker**: uvicorn runs **one worker**. The embedding model and its torch
+  runtime live in-process; multiple workers would each load their own copy, and the API
+  shares the 4-core/8 GB floor with Postgres and the Ollama runtime. No `--reload`
   (a reload subprocess would reload the model).
 - **Blocking, threadpool concurrency**: endpoints are defined as sync `def` so FastAPI runs
   them in its threadpool — `retrieve` (CPU embed + blocking DB call) and `generate`
@@ -221,7 +222,7 @@ the warm retrieve function and the real generate function, and return `AskRespon
 table.
 
 End-to-end demoable: `make serve`, then `curl -X POST /ask -d '{"question":"…"}'` returns a
-grounded German answer with numbered `§` sources — reusing the model loaded in Phase 1, no
+grounded English answer with numbered sources — reusing the model loaded in Phase 1, no
 reload.
 
 ### Acceptance criteria
@@ -229,7 +230,7 @@ reload.
 - [ ] A shared composition function in `rag/ask/` returns `{ answer, hits: list[RetrievedChunk],
       stats: GenerationStats }` and accepts an `on_delta` callback (default no-op).
 - [ ] `rag.ask.main()` (the CLI) is rewired to call it and still streams tokens to stdout and
-      prints the `Quellen:` block — existing `ask` behaviour and tests unchanged.
+      prints the `Sources:` block — existing `ask` behaviour and tests unchanged.
 - [ ] `POST /ask` accepts `AskRequest { question, top_k=TOP_K }` and returns
       `AskResponse { answer, sources: [{n, citation, source_title, source_url}], stats }`.
 - [ ] The endpoint reuses the warm embedder from startup (no per-request model construction).
