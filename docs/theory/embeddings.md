@@ -35,8 +35,7 @@ The producing models are transformer encoders. sentence-transformers wraps the r
 into one call, but the steps are worth seeing once:
 
 1. **Tokenize** — the text becomes subword tokens. The pinned model's tokenizer is
-   **English-only** (the pipeline's earlier multilingual model's was not) — a fit, not a
-   regression, now that the corpus is English Wikipedia. Models have a token limit, and an
+   **English-only** — a fit for the English Wikipedia corpus. Models have a token limit, and an
    encoder left to itself silently truncates anything over it. This model's window is
    **512 tokens** — tight enough that chunk size is load-bearing rather than slack, which is
    why the [chunking chapter](chunking.md#characters-versus-tokens) pins the character cap

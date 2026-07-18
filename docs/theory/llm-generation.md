@@ -87,11 +87,10 @@ shrinking the model to ≈ 2.1 GB, roughly a third of its fp16 size. Fewer bits 
 means fewer bytes to stream per decode step, so quantization helps the memory-bandwidth wall
 too, not only the footprint.
 
-This is the headline of the model pivot. At ≈ 2.1 GB served, granite4:micro fits the
-4-core/8 GB floor **without swap**, with room for Postgres and the embedder beside it. The
-previous 4-billion-parameter model served at ≈ 3.9 GB and only ran here through swap, which is
-exactly where its floor-bound throughput came from — so the win is swap-avoidance, not raw
-speed.
+At ≈ 2.1 GB served, granite4:micro fits the 4-core/8 GB floor **without swap**, with room for
+Postgres and the embedder beside it — the win over a heavier model is swap-avoidance, not raw
+speed: a served size over the RAM budget only runs through swap, and floor-bound throughput
+follows from exactly that.
 
 **GGUF** is the single-file container llama.cpp (and therefore Ollama) loads: the quantized
 weights plus tokenizer and metadata, memory-mappable, one file per model tag. The trade-off is
@@ -121,7 +120,7 @@ again to the prompt cap. The pinned floor and the derived character cap live in 
 [assemble contract](../stages/assemble.md) and
 [`src/rag/assemble/`](../../src/rag/assemble/__init__.py).
 
-The window itself shrank with the model pivot, from 8192 to **`num_ctx` 4096**.
+The served window is pinned to **`num_ctx` 4096**.
 granite4:micro's native context is 128 K tokens, so 4096 is a deliberate CPU budget, not a
 model limit: a small window keeps the KV cache cheap and the prefill sweep short, and the
 football prompts it must hold are short — five retrieved sections and a question, with no

@@ -15,10 +15,10 @@ setup:         ## Install dependencies into .venv (uv sync)
 
 .PHONY: fetch convert chunk embed load
 
-fetch:         ## Download law XML from gesetze-im-internet.de into data/raw/
+fetch:         ## Download Wikipedia article extracts into data/raw/
 	uv run python -m rag.fetch
 
-convert:       ## Convert fetched law XML into Markdown under data/corpus/
+convert:       ## Convert fetched article extracts into Markdown under data/corpus/
 	uv run python -m rag.convert
 
 chunk:         ## Chunk corpus Markdown into JSONL records under data/chunks/

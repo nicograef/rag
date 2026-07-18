@@ -134,7 +134,7 @@ def test_split_part_ids_and_citation_are_section_scoped(tmp_path: Path) -> None:
 
     assert parts, "citypark should have split parts"
     for record in parts:
-        assert record["unit"] == "History"
+        assert record["section"] == "History"
         assert record["citation"] == "City Park F.C. — History"
         assert record["id"].startswith("citypark#History#")
         assert record["section_path"] == []
@@ -144,7 +144,7 @@ def test_split_part_ids_and_citation_are_section_scoped(tmp_path: Path) -> None:
 
 
 def test_consecutive_sub_floor_sections_merge(tmp_path: Path) -> None:
-    # Two short sections: one merged chunk keyed on the first, its `unit`/`citation` listing
+    # Two short sections: one merged chunk keyed on the first, its `section`/`citation` listing
     # both, its text the two sections joined by a blank line, part null.
     corpus_file = write_corpus(
         tmp_path, "\n## Nickname\n\nThe Bees.\n\n## Mascot\n\nBuzz the bee.\n"
@@ -153,7 +153,7 @@ def test_consecutive_sub_floor_sections_merge(tmp_path: Path) -> None:
     (record,) = _records(chunk_article(corpus_file, tmp_path / "chunks", merge_floor=500))
 
     assert record["id"] == "club#Nickname"
-    assert record["unit"] == "Nickname, Mascot"
+    assert record["section"] == "Nickname, Mascot"
     assert record["citation"] == "Club F.C. — Nickname, Mascot"
     assert record["text"] == "## Nickname\n\nThe Bees.\n\n## Mascot\n\nBuzz the bee."
     assert record["part"] is None
@@ -168,7 +168,7 @@ def test_an_above_floor_section_is_never_merged(tmp_path: Path) -> None:
 
     records = _records(chunk_article(corpus_file, tmp_path / "chunks", merge_floor=60))
 
-    assert [record["unit"] for record in records] == ["Nickname", "History"]
+    assert [record["section"] for record in records] == ["Nickname", "History"]
 
 
 def test_an_empty_section_between_candidates_blocks_the_merge(tmp_path: Path) -> None:
@@ -179,7 +179,7 @@ def test_an_empty_section_between_candidates_blocks_the_merge(tmp_path: Path) ->
 
     records = _records(chunk_article(corpus_file, tmp_path / "chunks", merge_floor=500))
 
-    assert [record["unit"] for record in records] == ["Nickname", "Mascot"]
+    assert [record["section"] for record in records] == ["Nickname", "Mascot"]
 
 
 def test_a_merged_chunk_never_exceeds_the_max(tmp_path: Path) -> None:

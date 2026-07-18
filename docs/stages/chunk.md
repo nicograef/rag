@@ -46,13 +46,13 @@ consumes** — is:
 
 | Field          | Type            | Value                                                            |
 | -------------- | --------------- | ------------------------------------------------------------------------ |
-| `id`           | string          | `<slug>#<unit>` for a whole section; `<slug>#<unit>#<n>` (1-based) for a split part; a **merged** chunk keys on its **first** covered section (`<slug>#<firstunit>`) — the chunk's stable structural identity; unique within an article (a collision raises) |
+| `id`           | string          | `<slug>#<section>` for a whole section; `<slug>#<section>#<n>` (1-based) for a split part; a **merged** chunk keys on its **first** covered section (`<slug>#<firstsection>`) — the chunk's stable structural identity; unique within an article (a collision raises) |
 | `text`         | string          | The section's own heading line (plain, `#` stripped), then a blank line, then its body (including any subsections); just the heading if the body is empty. A **merged** chunk joins its covered sections' texts with a blank line |
 | `slug`         | string          | Source identifier — the article slug, from front matter          |
 | `source_title` | string          | The article title, from front matter                             |
-| `unit`         | string          | Section identifier — the `##` heading text (e.g. `History`); a **merged** chunk lists its covered sections joined `, ` |
+| `section`         | string          | Section identifier — the `##` heading text (e.g. `History`); a **merged** chunk lists its covered sections joined `, ` |
 | `section_path` | list of strings | Ancestor section headings, outermost first; always `[]` — `##` sections sit directly under the H1 in these shallow articles |
-| `citation`     | string          | Human citation label — `<source_title> — <unit>` (e.g. `Arsenal F.C. — History`); a **merged** chunk lists all covered sections |
+| `citation`     | string          | Human citation label — `<source_title> — <section>` (e.g. `Arsenal F.C. — History`); a **merged** chunk lists all covered sections |
 | `source_url`   | string          | From front matter — provenance / data lineage                    |
 | `fetched_at`   | string          | From front matter — provenance / data lineage                    |
 | `part`         | object or null  | `null` for a whole section (incl. a merged chunk); `{ "index": n, "total": m }` for part `n` of `m` of a split section |
@@ -84,7 +84,7 @@ segment. A section with no subheading yields one segment holding every block.
   character window of `max_chars // 10` characters (120 at the default max). Each piece
   still leads with the heading.
 
-A split part is keyed `id = <slug>#<unit>#<n>` (1-based) with `part = { "index": n, "total":
+A split part is keyed `id = <slug>#<section>#<n>` (1-based) with `part = { "index": n, "total":
 m }`. **No silent text loss:** concatenating a split section's parts minus the duplicated
 overlap reproduces the section's full body verbatim — asserted in the tests for both the
 segment-group and recursive-character cases.
@@ -104,11 +104,11 @@ a single chunk:
   the merged `text` over `max_chars` flushes the group first — **the max rule wins over the
   floor** even when `floor > max`.
 
-Flushing a group of **one** emits a normal single whole chunk (`id = <slug>#<unit>`, `unit`,
-`citation = <source_title> — <unit>`, `part = null`) — byte-identical to the pre-merge
+Flushing a group of **one** emits a normal single whole chunk (`id = <slug>#<section>`, `section`,
+`citation = <source_title> — <section>`, `part = null`) — byte-identical to the pre-merge
 output, so a lone sub-floor section with no eligible neighbour is unchanged. Flushing a
 group of **two or more** emits one merged chunk: its `text` joins the covered sections'
-texts with a blank line, its `id` keys on the **first** covered section, `unit` lists the
+texts with a blank line, its `id` keys on the **first** covered section, `section` lists the
 covered sections joined `, `, `citation` lists the same sections after `<source_title> — `,
 and `part` is `null`.
 

@@ -13,7 +13,7 @@ import psycopg
 import pytest
 from conftest import FakeEmbedder
 
-from rag.embed import EMBEDDING_DIM, embed_law
+from rag.embed import EMBEDDING_DIM, embed_article
 from rag.load import SCHEMA_SQL
 from rag.load import main as load_main
 from rag.retrieve import RetrievedChunk, RetrieveError, format_hit, main, retrieve
@@ -96,7 +96,7 @@ def _load_citypark(test_db: psycopg.Connection, tmp_path: Path) -> None:
     source = FIXTURES / "chunks" / "citypark.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
     embeddings_dir = tmp_path / "embeddings"
-    embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    embed_article(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
     assert (
         load_main(["--chunks-dir", str(chunks_dir), "--embeddings-dir", str(embeddings_dir)]) == 0
     )

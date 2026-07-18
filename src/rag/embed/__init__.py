@@ -1,12 +1,12 @@
 """Embed stage — turn chunk records into vectors with the pinned sentence-transformers model.
 
-Reads each law's chunk records from ``data/chunks/<slug>.jsonl`` (produced by the chunk
-stage) and writes one JSONL file per law to ``data/embeddings/<slug>.jsonl``: one embedding
+Reads each article's chunk records from ``data/chunks/<slug>.jsonl`` (produced by the chunk
+stage) and writes one JSONL file per article to ``data/embeddings/<slug>.jsonl``: one embedding
 record per chunk (``id``, ``model``, ``dim``, ``embedding``), input order preserved. Only the
 chunk fields ``id`` and ``text`` are consumed. The model is hidden behind the minimal
 ``Embedder`` interface; the one real implementation wraps the pinned model with batch
 encoding on CPU (sentence-transformers is imported lazily so the default test suite never
-loads torch). A chunk longer than the model's token window fails the law instead of being
+loads torch). A chunk longer than the model's token window fails the article instead of being
 silently truncated — the no-silent-loss guarantee holds across the chunk→embed boundary.
 Reproducible within tolerance — never bitwise (floating-point results vary across hardware
 and library versions).
@@ -39,7 +39,7 @@ BATCH_SIZE = int(os.environ.get("EMBED_BATCH_SIZE", "16"))
 
 
 class EmbedError(Exception):
-    """Raised when a law's chunk records cannot be embedded faithfully."""
+    """Raised when an article's chunk records cannot be embedded faithfully."""
 
 
 class Embedder(Protocol):
@@ -106,20 +106,20 @@ def read_chunk_texts(chunks_file: Path) -> list[tuple[str, str]]:
     return pairs
 
 
-def embed_law(chunks_file: Path, embeddings_dir: Path, embedder: Embedder) -> Path:
+def embed_article(chunks_file: Path, embeddings_dir: Path, embedder: Embedder) -> Path:
     """Embed one ``data/chunks/<slug>.jsonl`` into ``embeddings_dir/<slug>.jsonl``.
 
     One self-describing record per chunk — ``id``, ``model``, ``dim``, ``embedding`` —
-    in chunk-file order. A chunk over the model's token window fails the law before
+    in chunk-file order. A chunk over the model's token window fails the article before
     anything is embedded (``encode`` would silently truncate it); the output file is only
-    written after the whole law embedded successfully.
+    written after the whole article embedded successfully.
     """
     pairs = read_chunk_texts(chunks_file)
     for chunk_id, text in pairs:
         if (tokens := embedder.token_count(text)) > embedder.max_tokens:
             raise EmbedError(
                 f"chunk {chunk_id} is {tokens} tokens, over the model's {embedder.max_tokens}"
-                " — refusing to silently truncate normative text"
+                " — refusing to silently truncate chunk text"
             )
     vectors = embedder.embed([text for _, text in pairs])
     if len(vectors) != len(pairs):
@@ -137,7 +137,7 @@ def embed_law(chunks_file: Path, embeddings_dir: Path, embedder: Embedder) -> Pa
 
 
 def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int:
-    """Embed every chunked law; returns a non-zero exit code if any failed.
+    """Embed every chunked article; returns a non-zero exit code if any failed.
 
     ``embedder`` is injectable for tests; by default the real model is constructed lazily —
     after the input directory check, so a missing input fails fast without loading torch.
@@ -164,7 +164,7 @@ def main(argv: list[str] | None = None, embedder: Embedder | None = None) -> int
         (
             chunks_file.stem,
             lambda chunks_file=chunks_file: (
-                f"→ {embed_law(chunks_file, args.embeddings_dir, embedder)}"
+                f"→ {embed_article(chunks_file, args.embeddings_dir, embedder)}"
             ),
         )
         for chunks_file in chunks_files

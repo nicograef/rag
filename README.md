@@ -37,14 +37,13 @@ in the [roadmap](docs/roadmap.md).
 | 4 — Online PoC                       | retrieve, assemble, generate            | ✅     |
 | 5+ — Enhancement backlog             | — (incl. the cross-cutting evaluate harness) | ⬜  |
 
-> **Corpus pivot — whole loop verified 2026-07-18:** the pipeline now runs end to end on an
-> **English Wikipedia** corpus (the 20 current Premier League clubs, `clubs.toml`) — **fetch**,
-> **convert**, **chunk**, **embed** (`BAAI/bge-small-en-v1.5`, dim 384), **load**
-> (`vector(384)`), and the online path (**assemble**, **generate** on `granite4:micro`). A full
-> `make fetch` → `make load` run indexed 1,333 chunks, and `make ask "Which stadium does
-> Arsenal play at?"` answers *"Arsenal plays at the Emirates Stadium"* with a numbered `Sources:`
-> block and a CC BY-SA notice. The wrap-up slice re-verifies the whole loop from a clean
-> checkout on the 4-core/8 GB floor and finishes the positioning/corpus prose below.
+> **Whole loop verified 2026-07-18:** the pipeline runs end to end on the **English Wikipedia**
+> corpus (the 20 current Premier League clubs, `clubs.toml`) — **fetch**, **convert**, **chunk**,
+> **embed** (`BAAI/bge-small-en-v1.5`, dim 384), **load** (`vector(384)`), and the online path
+> (**assemble**, **generate** on `granite4:micro`). A full `make fetch` → `make load` run indexed
+> 1,333 chunks, and `make ask "Which stadium does Arsenal play at?"` answers *"Arsenal plays at
+> the Emirates Stadium"* with a numbered `Sources:` block and a CC BY-SA notice — re-verified from
+> a clean checkout on the 4-core/8 GB floor.
 
 ## Quick start
 
@@ -144,7 +143,7 @@ stays cheap here, is the [corpus & parsing](docs/theory/corpus-and-parsing.md) c
 **Swapping in your own corpus** — the honest blast radius: reimplement **fetch** and
 **convert** for your source, and adapt the chunker's structural logic and citation fields to
 your documents' structure. The chunk-record contract uses corpus-neutral field names
-(`source_title`, `unit`, `section_path`, `citation`), and each stage contract states exactly
+(`source_title`, `section`, `section_path`, `citation`), and each stage contract states exactly
 which fields downstream stages require — so the boundary is explicit, not discovered. The
 first two contracts ([fetch](docs/stages/fetch.md), [convert](docs/stages/convert.md)) are
 landed; the rest arrive with their phases (status table above).
@@ -167,7 +166,7 @@ hosting) can rot; each phase re-verifies the quick start and records the date.
 | `docs/concepts.md`   | Concept map: every tracked RAG concept, defined once, with its place |
 | `docs/stages/`       | Stage contracts: input/output artifacts, invocation, guarantees  |
 | `docs/theory/`       | Theory chapters: one building block each, landed with its phase  |
-| `docs/prds/`         | PRDs: the product big picture, plus the English-Wikipedia-pivot PRD |
+| `docs/prds/`         | PRDs: the product big picture                                    |
 | `docs/plans/`        | Implementation plans for reviewed changes                        |
 | `scripts/`           | Dev tool setup script                                            |
 | `data/`              | Raw downloads (`data/raw/`), corpus (`data/corpus/`), chunks (`data/chunks/`), embeddings (`data/embeddings/`) — gitignored, re-runnable |

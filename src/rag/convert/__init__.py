@@ -28,7 +28,7 @@ LEAD_HEADING = "Introduction"
 
 # Non-prose apparatus sections dropped from the corpus (matched case-insensitively on the
 # level-2 heading text). Their subsections go with them. TextExtracts already flattens/empties
-# most of these; dropping the rest keeps the corpus prose, matching the law-text precedent.
+# most of these; dropping the rest keeps the corpus prose.
 EXCLUDED_SECTIONS = frozenset(
     {
         "references",

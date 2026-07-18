@@ -1,16 +1,16 @@
 """Load stage — fill Postgres/pgvector with chunk records and their embeddings, idempotently.
 
-Reads each law's chunk records from ``data/chunks/<slug>.jsonl`` and its embedding records
+Reads each article's chunk records from ``data/chunks/<slug>.jsonl`` and its embedding records
 from ``data/embeddings/<slug>.jsonl`` (produced by the chunk and embed stages), joins them
 by chunk ``id``, and writes the ``chunks`` table this stage owns: text, metadata, and a
 fixed-dimension vector column with one HNSW index. Every run ensures the schema exists
-(``CREATE ... IF NOT EXISTS``) and applies per-law replace semantics — upsert every row by
-``id``, then delete the law's rows whose ids are gone — so each law present in the input
-mirrors its current artifacts. The mirror is per-law only: a law whose artifact files are
+(``CREATE ... IF NOT EXISTS``) and applies per-article replace semantics — upsert every row by
+``id``, then delete the article's rows whose ids are gone — so each article present in the input
+mirrors its current artifacts. The mirror is per-article only: an article whose artifact files are
 removed entirely is never visited, so its rows stay until the table is rebuilt. A chunk
 without a vector, a vector without a chunk, a record ``slug`` that contradicts the file
-name, or model/dimension disagreement across records is a per-law error; nothing partial
-is written for that law.
+name, or model/dimension disagreement across records is a per-article error; nothing partial
+is written for that article.
 
 Stage contract: docs/stages/load.md
 Theory: docs/theory/vector-indexes.md
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     id text PRIMARY KEY,
     slug text,
     source_title text,
-    unit text,
+    section text,
     section_path text[],
     citation text,
     source_url text,
@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_idx
 
 
 class LoadError(Exception):
-    """Raised when a law's artifacts cannot be joined or written faithfully."""
+    """Raised when an article's artifacts cannot be joined or written faithfully."""
 
 
 @dataclass(frozen=True)
@@ -71,7 +71,7 @@ class Row:
     id: str
     slug: str
     source_title: str
-    unit: str
+    section: str
     section_path: list[str]
     citation: str
     source_url: str
@@ -97,13 +97,13 @@ def read_records(jsonl_file: Path) -> list[dict[str, Any]]:
     return records
 
 
-def join_law(
+def join_article(
     slug: str,
     chunk_records: list[dict[str, Any]],
     embedding_records: list[dict[str, Any]],
     dim: int,
 ) -> list[Row]:
-    """Join one law's chunk and embedding records by ``id`` into table rows, validating both.
+    """Join one article's chunk and embedding records by ``id`` into table rows, validating both.
 
     Raises ``LoadError`` — before anything could be written — when a chunk has no vector, a
     vector has no chunk, a chunk record's ``slug`` contradicts the artifact file's ``slug``
@@ -138,7 +138,7 @@ def join_law(
                 id=record["id"],
                 slug=record["slug"],
                 source_title=record["source_title"],
-                unit=record["unit"],
+                section=record["section"],
                 section_path=record["section_path"],
                 citation=record["citation"],
                 source_url=record["source_url"],
@@ -175,31 +175,32 @@ def connection_conninfo() -> str:
     )
 
 
-def load_law(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None:
-    """Write one law's rows with replace semantics, atomically.
+def load_article(connection: psycopg.Connection, slug: str, rows: list[Row]) -> None:
+    """Write one article's rows with replace semantics, atomically.
 
-    Upserts every row by ``id``, then deletes the law's rows whose ids are absent from the
-    current artifacts — the law's rows mirror the pipeline output and never go stale. Runs
-    in one transaction: a mid-law failure leaves the law's previous state intact.
+    Upserts every row by ``id``, then deletes the article's rows whose ids are absent from the
+    current artifacts — the article's rows mirror the pipeline output and never go stale. Runs
+    in one transaction: a mid-article failure leaves the article's previous state intact.
     """
     with connection.transaction(), connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO chunks (id, slug, source_title, unit, section_path, citation,
+            INSERT INTO chunks (id, slug, source_title, section, section_path, citation,
                                 source_url, fetched_at, part, text, embedding)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
-                slug = EXCLUDED.slug, source_title = EXCLUDED.source_title, unit = EXCLUDED.unit,
-                section_path = EXCLUDED.section_path, citation = EXCLUDED.citation,
-                source_url = EXCLUDED.source_url, fetched_at = EXCLUDED.fetched_at,
-                part = EXCLUDED.part, text = EXCLUDED.text, embedding = EXCLUDED.embedding
+                slug = EXCLUDED.slug, source_title = EXCLUDED.source_title,
+                section = EXCLUDED.section, section_path = EXCLUDED.section_path,
+                citation = EXCLUDED.citation, source_url = EXCLUDED.source_url,
+                fetched_at = EXCLUDED.fetched_at, part = EXCLUDED.part,
+                text = EXCLUDED.text, embedding = EXCLUDED.embedding
             """,
             [
                 (
                     row.id,
                     row.slug,
                     row.source_title,
-                    row.unit,
+                    row.section,
                     row.section_path,
                     row.citation,
                     row.source_url,
@@ -239,23 +240,25 @@ def _check_schema_dimension(connection: psycopg.Connection) -> None:
         )
 
 
-def _load_law_files(
+def _load_article_files(
     connection: psycopg.Connection, chunks_dir: Path, embeddings_dir: Path, slug: str
 ) -> str:
-    """One law's job: require both artifacts, join them, write; returns the ``✓`` detail."""
+    """One article's job: require both artifacts, join them, write; returns the ``✓`` detail."""
     chunks_file = chunks_dir / f"{slug}.jsonl"
     embeddings_file = embeddings_dir / f"{slug}.jsonl"
     if not chunks_file.is_file():
         raise LoadError("embeddings without chunk records — run `make chunk`")
     if not embeddings_file.is_file():
         raise LoadError("chunk records without embeddings — run `make embed`")
-    rows = join_law(slug, read_records(chunks_file), read_records(embeddings_file), EMBEDDING_DIM)
-    load_law(connection, slug, rows)
+    rows = join_article(
+        slug, read_records(chunks_file), read_records(embeddings_file), EMBEDDING_DIM
+    )
+    load_article(connection, slug, rows)
     return f"→ chunks table ({len(rows)} rows)"
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Load every law's artifacts into Postgres; returns a non-zero exit code if any failed."""
+    """Load every article's artifacts into Postgres; returns a non-zero exit code if any failed."""
     parser = argparse.ArgumentParser(
         prog="python -m rag.load",
         description="Load chunk records and embeddings into the Postgres/pgvector store.",
@@ -299,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
             jobs = [
                 (
                     slug,
-                    lambda slug=slug: _load_law_files(
+                    lambda slug=slug: _load_article_files(
                         connection, args.chunks_dir, args.embeddings_dir, slug
                     ),
                 )

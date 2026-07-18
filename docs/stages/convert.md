@@ -48,8 +48,8 @@ Body: H1 = article title, then the article's sections in document order.
   `===` → `###`, and so on. A heading past H6 (never valid wiki syntax) raises.
 - **Body blocks.** TextExtracts puts every paragraph — and every flattened list item —
   on its own line; each non-blank line becomes one blank-line-separated Markdown block.
-- **Apparatus sections dropped** — the Wikipedia analogue of the law converter's
-  footnote/table-of-contents exclusion: References, Notes, Footnotes, Citations,
+- **Apparatus sections dropped** — non-prose apparatus, not article prose:
+  References, Notes, Footnotes, Citations,
   Sources, Bibliography, Works cited, Further reading, External links, and See also,
   matched case-insensitively on the level-2 heading text (their subsections go with
   them).

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from conftest import FakeEmbedder
 
-from rag.embed import EmbedError, embed_law, main, read_chunk_texts
+from rag.embed import EmbedError, embed_article, main, read_chunk_texts
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -20,8 +20,8 @@ GOLDEN_SLUGS = ("brentford", "citypark")
 
 
 @pytest.mark.parametrize("slug", GOLDEN_SLUGS)
-def test_embed_law_matches_golden_file(slug: str, tmp_path: Path) -> None:
-    output = embed_law(FIXTURES / "chunks" / f"{slug}.jsonl", tmp_path, FakeEmbedder())
+def test_embed_article_matches_golden_file(slug: str, tmp_path: Path) -> None:
+    output = embed_article(FIXTURES / "chunks" / f"{slug}.jsonl", tmp_path, FakeEmbedder())
 
     assert output == tmp_path / f"{slug}.jsonl"
     assert output.read_bytes() == (FIXTURES / "embeddings" / f"{slug}.jsonl").read_bytes()
@@ -30,15 +30,15 @@ def test_embed_law_matches_golden_file(slug: str, tmp_path: Path) -> None:
 @pytest.mark.parametrize("slug", GOLDEN_SLUGS)
 def test_embed_is_deterministic(slug: str, tmp_path: Path) -> None:
     chunks_file = FIXTURES / "chunks" / f"{slug}.jsonl"
-    first = embed_law(chunks_file, tmp_path / "one", FakeEmbedder()).read_bytes()
-    second = embed_law(chunks_file, tmp_path / "two", FakeEmbedder()).read_bytes()
+    first = embed_article(chunks_file, tmp_path / "one", FakeEmbedder()).read_bytes()
+    second = embed_article(chunks_file, tmp_path / "two", FakeEmbedder()).read_bytes()
 
     assert first == second
 
 
 def test_records_are_self_describing_and_order_preserving(tmp_path: Path) -> None:
     chunks_file = FIXTURES / "chunks" / "brentford.jsonl"
-    output = embed_law(chunks_file, tmp_path, FakeEmbedder())
+    output = embed_article(chunks_file, tmp_path, FakeEmbedder())
 
     chunk_ids = [chunk_id for chunk_id, _ in read_chunk_texts(chunks_file)]
     records = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
@@ -55,7 +55,7 @@ def test_invalid_chunk_record_raises(tmp_path: Path) -> None:
     chunks_file.write_text('{"id": "x#History"}\n', encoding="utf-8")  # no `text`
 
     with pytest.raises(EmbedError, match="line 1"):
-        embed_law(chunks_file, tmp_path / "embeddings", FakeEmbedder())
+        embed_article(chunks_file, tmp_path / "embeddings", FakeEmbedder())
 
 
 def test_a_chunk_over_the_token_window_fails_before_writing(tmp_path: Path) -> None:
@@ -69,7 +69,7 @@ def test_a_chunk_over_the_token_window_fails_before_writing(tmp_path: Path) -> N
     embeddings_dir = tmp_path / "embeddings"
 
     with pytest.raises(EmbedError, match="refusing to silently truncate") as excinfo:
-        embed_law(chunks_file, embeddings_dir, FakeEmbedder(max_tokens=3))
+        embed_article(chunks_file, embeddings_dir, FakeEmbedder(max_tokens=3))
 
     assert "x#History" in str(excinfo.value)
     assert not (embeddings_dir / "over.jsonl").exists()  # nothing written on failure

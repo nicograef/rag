@@ -66,7 +66,7 @@ class Chunk:
     text: str
     slug: str
     source_title: str
-    unit: str
+    section: str
     section_path: list[str]
     citation: str
     source_url: str
@@ -78,7 +78,7 @@ class Chunk:
 class Section:
     """One article section: its heading, the material a chunk is built from, and its path."""
 
-    unit: str
+    title: str
     heading: str
     section_path: list[str]
     body: str
@@ -152,7 +152,7 @@ def parse_sections(lines: list[str]) -> list[Section]:
         title = lines[line_index][2:].strip()
         body_end = boundaries[position + 1] if position + 1 < len(boundaries) else len(lines)
         body = _body_between(lines, line_index + 1, body_end)
-        sections.append(Section(unit=title, heading=heading, section_path=[], body=body))
+        sections.append(Section(title=title, heading=heading, section_path=[], body=body))
     return sections
 
 
@@ -363,7 +363,7 @@ def _build_chunk(
     fields: dict[str, str],
     chunk_id: str,
     text: str,
-    unit: str,
+    section: str,
     section_path: list[str],
     part: dict[str, int] | None,
 ) -> Chunk:
@@ -374,9 +374,9 @@ def _build_chunk(
         text=text,
         slug=fields[SLUG_KEY],
         source_title=source_title,
-        unit=unit,
+        section=section,
         section_path=section_path,
-        citation=f"{source_title}{HEADING_SEPARATOR}{unit}",
+        citation=f"{source_title}{HEADING_SEPARATOR}{section}",
         source_url=fields[SOURCE_URL_KEY],
         fetched_at=fields[FETCHED_AT_KEY],
         part=part,
@@ -389,17 +389,17 @@ def _chunks_from_section(section: Section, fields: dict[str, str], max_chars: in
     text = _section_text(section)
 
     def _chunk(chunk_id: str, chunk_text: str, part: dict[str, int] | None) -> Chunk:
-        return _build_chunk(fields, chunk_id, chunk_text, section.unit, section.section_path, part)
+        return _build_chunk(fields, chunk_id, chunk_text, section.title, section.section_path, part)
 
     if len(text) <= max_chars or not section.body:
-        return [_chunk(f"{slug}#{section.unit}", text, None)]
+        return [_chunk(f"{slug}#{section.title}", text, None)]
 
     parts = _split_body(section.body, section.heading, max_chars)
     total = len(parts)
     if total == 1:
-        return [_chunk(f"{slug}#{section.unit}", parts[0].text, None)]
+        return [_chunk(f"{slug}#{section.title}", parts[0].text, None)]
     return [
-        _chunk(f"{slug}#{section.unit}#{n}", part.text, {"index": n, "total": total})
+        _chunk(f"{slug}#{section.title}#{n}", part.text, {"index": n, "total": total})
         for n, part in enumerate(parts, start=1)
     ]
 
@@ -414,16 +414,16 @@ def _flush_group(group: list[Section], fields: dict[str, str], max_chars: int) -
 
     A group of one is a normal single whole chunk (byte-identical to the pre-merge output).
     A group of two or more becomes one merged chunk: its ``text`` joins the covered sections'
-    texts with a blank line, it keys on the FIRST covered section, and ``unit``/``citation``
+    texts with a blank line, it keys on the FIRST covered section, and ``section``/``citation``
     list every covered section (``part`` is ``null``).
     """
     if len(group) == 1:
         return _chunks_from_section(group[0], fields, max_chars)
     first = group[0]
     text = BLOCK_SEPARATOR.join(_section_text(section) for section in group)
-    unit = ", ".join(section.unit for section in group)
+    section = ", ".join(covered.title for covered in group)
     chunk = _build_chunk(
-        fields, f"{fields[SLUG_KEY]}#{first.unit}", text, unit, first.section_path, None
+        fields, f"{fields[SLUG_KEY]}#{first.title}", text, section, first.section_path, None
     )
     return [chunk]
 

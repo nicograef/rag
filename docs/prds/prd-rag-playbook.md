@@ -187,8 +187,8 @@ corpus actually requires.
   corpus, fetched at runtime via the MediaWiki API. It is a feature: a real heading
   hierarchy (article → == section == → === subsection ===) keeps structure-aware chunking
   a genuine lesson instead of a toy, and the English content reads to any learner. That the
-  domain is more conventional than richly-structured law is acknowledged in the docs; the
-  gain — runs on any laptop, reads to anyone — is the deliberate reason.
+  domain is more conventional than a richly-structured reference corpus is acknowledged in the
+  docs; the gain — runs on any laptop, reads to anyone — is the deliberate reason.
 - Licensing: Wikipedia text is CC BY-SA 4.0 — properly licensed, not public domain. The
   claim is verified against Wikipedia's copyright terms when the fetch stage lands and
   recorded as a dated decision. Because `data/` is gitignored (the corpus is fetched at
@@ -261,7 +261,7 @@ Known risks, accepted deliberately:
 - **bge-small is weaker than a full multilingual model.** A deliberate trade for a model
   that fits the 4-core/8 GB floor and reads to an English audience; recorded as a trade,
   not a silent downgrade.
-- **The demo domain is more conventional than richly-structured law.** Football-over-
+- **The demo domain is more conventional than a richly-structured reference corpus.** Football-over-
   Wikipedia is closer to a standard RAG demo; sectioned articles keep it above a toy blog
   post, but the domain-richness trade is real and named. The gain — runs on any laptop,
   reads to anyone — is the deliberate reason.

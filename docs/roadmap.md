@@ -51,7 +51,7 @@ Goal: split the Markdown corpus into retrieval units without destroying article 
   `###` subsections) as the natural semantic unit; split an oversized section into ordered
   parts — subsection groups with overlap, and a recursive-character fallback for a single
   overlong paragraph; merge consecutive tiny sections into one chunk.
-- Each chunk carries **metadata**: `source_title`, `unit` (the section name), `section_path`,
+- Each chunk carries **metadata**: `source_title`, `section` (the section name), `section_path`,
   a human-readable `citation`, source URL, fetch date — the basis for later filtering and
   citations.
 - Learn here: why chunk size matters, recursive character splitting as the baseline,
@@ -185,12 +185,12 @@ prunes superseded decisions, not the verify-before-claiming discipline).
 | Python tooling      | uv (venv, lockfile, `uv run`)                                 |
 | Corpus acquisition  | English Wikipedia article extracts (MediaWiki Action API) → Markdown via Python |
 | MVP corpus          | The 20 current Premier League clubs' English Wikipedia articles |
-| Docs language       | English (German only for corpus + domain terms)               |
+| Docs language       | English (docs, code, corpus, and domain terms)                |
 | LLM runtime (PoC)   | Ollama                                                        |
 | Data in git         | None — `data/` fully gitignored, pipeline re-runnable         |
 | Repository license  | MIT                                                           |
 | Docker usage        | Stateful infrastructure only (see below)                      |
-| Design floor        | 4-core / 8 GB CPU-only, no GPU (lowered from 8-core/16 GB in the 2026-07 English-Wikipedia pivot) — nothing may require more; the pinned models (bge-small-en ≈ 130 MB, granite4:micro ≈ 2.1 GB served) fit the budget, re-verified end to end on 2026-07-18 (see the embedding- and generation-model decisions) |
+| Design floor        | 4-core / 8 GB CPU-only, no GPU — nothing may require more; the pinned models (bge-small-en ≈ 130 MB, granite4:micro ≈ 2.1 GB served) fit the budget, re-verified end to end on 2026-07-18 (see the embedding- and generation-model decisions) |
 
 > **Assumption:** no RAG frameworks (LangChain/LlamaIndex/Haystack) — primitives are built
 > by hand from plain libraries, because the goal is learning how RAG works internally.
@@ -207,9 +207,6 @@ long-running infrastructure and for deployment — not for code under active dev
   provide the reproducibility.
 - **Future Go/React app:** dockerized at deployment time, following the handbook's
   Compose/nginx templates.
-
-> **Assumption:** the embedding model is chosen in Phase 3 after researching current model
-> cards (open license, multilingual, CPU-capable) — not fixed now.
 
 **Playbook repositioning** (decided 2026-07-11): the repository is a learning project that
 doubles as a public **RAG playbook** — a production-shaped, self-hosted, framework-free
@@ -261,8 +258,7 @@ and everything downstream.
 - **Context:** the pipeline embeds English Wikipedia article sections and question text with
   one open-license, CPU-capable sentence-transformers model, on the 4-core/8 GB floor. The
   choice fixes the vector dimension, normalization, and distance operator for the store, and
-  the retrieve stage embeds questions with the same model. This supersedes the former
-  multilingual bge-m3 choice, which was sized for a German corpus and a 16 GB floor.
+  the retrieve stage embeds questions with the same model.
 - **Choice:** **`BAAI/bge-small-en-v1.5`** — MIT license, 33.4 M parameters, dense dimension
   **384**, input limit **512 tokens**, English. Vectors are **L2-normalized**, so the pinned
   pgvector operator is **cosine distance `<=>`** with an HNSW index on `vector_cosine_ops`
@@ -273,10 +269,10 @@ and everything downstream.
   [`src/rag/load/`](../src/rag/load/__init__.py).
 - **Why bge-small-en (facts verified live 2026-07-17 against the model card; the 384/512
   properties re-confirmed at runtime with the loaded model):**
-  - **Fits the 8 GB floor.** A ≈ 130 MB download and a tiny CPU footprint — the swap-bound
-    memory pressure of bge-m3 (≈ 9 GiB peak RSS, over the 8 GB floor) is gone.
-  - **English, matched to the corpus.** The corpus is now English Wikipedia, so a strong
-    English-only model beats a multilingual one carried for a language the corpus no longer uses.
+  - **Fits the 8 GB floor.** A ≈ 130 MB download and a tiny CPU footprint sit comfortably
+    under the 8 GB floor.
+  - **English, matched to the corpus.** The corpus is English Wikipedia, so a strong
+    English-only model beats a multilingual one on this corpus.
   - **Symmetric path.** v1.5 makes the query instruction prefix optional, so the pipeline uses
     **no instruction** for queries or passages — ingest and question embedding share one
     interface. The query-only prefix (`"Represent this sentence for searching relevant
@@ -284,8 +280,8 @@ and everything downstream.
     default.
   - **MIT-licensed**, satisfying the open-source-only rule with no attribution burden on the
     weights.
-- **The 512-token consequence — chunk sizing is now load-bearing.** bge-m3's 8192-token
-  window left chunk size slack; bge-small-en's **512-token** cap does not. `max_chars` is
+- **The 512-token consequence — chunk sizing is load-bearing.** bge-small-en's **512-token**
+  cap leaves chunk size no slack. `max_chars` is
   pinned to 1200 characters, validated with the model's own tokenizer over the fetched corpus
   (densest ≈ 2.44 chars/token → ≤ ~492 tokens worst-case, observed max 375), and the embed
   token-guard is the hard backstop (see the [chunk contract](stages/chunk.md)).
@@ -293,17 +289,17 @@ and everything downstream.
   corpus, 1333 chunks, on the available 8-core/5.7 GB machine — a tighter RAM budget than the
   8 GB floor):** the model download is **≈ 130 MB** (129 MiB in `~/.cache/huggingface/`, a
   single snapshot — no double-fetch); the full embed run took **≈ 3 min 49 s** wall (≈ 5.8
-  chunks/s) at batch 16. bge-small-en's tiny footprint (vs bge-m3's ≈ 9 GiB peak RSS) fits the
+  chunks/s) at batch 16. bge-small-en's tiny footprint fits the
   8 GB budget with room to spare. A `make query` spot-check returned plausible sections ranked
   by cosine distance (e.g. "Which stadium does Arsenal play at?" → the `Arsenal F.C. — Stadiums`
   chunks at distance ≈ 0.20).
-- **Accepted trade:** bge-small is far weaker than bge-m3 in absolute retrieval quality — a
-  deliberate trade for a model that fits 4-core/8 GB and reads to an English audience, not a
-  silent downgrade. Exact-match on club names and years still motivates hybrid BM25 + RRF
-  (Backlog 2).
-- **Late chunking no longer applies.** Unlike bge-m3, bge-small-en exposes no token-level
-  (ColBERT) vectors and caps at 512 tokens, so the Backlog 6 late-chunking precondition (a
-  long-context model with token embeddings) is **no longer met** — recorded in the concept map.
+- **Accepted trade:** a small English model like bge-small has modest absolute retrieval
+  quality — a deliberate trade for a model that fits 4-core/8 GB and reads to an English
+  audience, not a silent downgrade. Exact-match on club names and years still motivates hybrid
+  BM25 + RRF (Backlog 2).
+- **Late chunking does not apply.** bge-small-en exposes no token-level (ColBERT) vectors and
+  caps at 512 tokens, so the Backlog 6 late-chunking precondition (a long-context model with
+  token embeddings) is **not met** — recorded in the concept map.
 - **Consequences:** the `chunks.embedding` column is `vector(384)`; a table left at an earlier
   dimension is refused with a `make reset` hint (the load dimension guard); question embedding
   in the retrieve stage uses the same pinned model; retrieval-quality claims stay anecdotal
@@ -316,11 +312,9 @@ decoding parameters, and the retrieval top-k, pinned together for the online pat
   the retrieved Wikipedia sections, with an open-weight instruct model served by Ollama on
   the **4-core/8 GB** floor. Rule 1 in [AGENTS.md](../AGENTS.md) holds to a strict open-source
   bar (Apache-2.0/MIT-class weights only). Retrieval k, chunk size, and the model's served
-  context length form one context budget, so they are pinned in one decision. This supersedes
-  the former qwen3:4b-instruct choice, which was picked for German quality and ran swap-bound
-  below the old 16 GB floor. External claims below were verified live 2026-07-18 against the
-  Granite model card and the ollama.com library, and re-confirmed by an empirical run of the
-  pinned image.
+  context length form one context budget, so they are pinned in one decision. External claims
+  below were verified live 2026-07-18 against the Granite model card and the ollama.com library,
+  and re-confirmed by an empirical run of the pinned image.
 - **Choice:** **`granite4:micro`** (IBM Granite-4.0-Micro, ~3 B dense decoder-only, Q4_K_M
   GGUF ≈ 2.1 GB, Apache-2.0 per the model card), served by the pinned Compose service
   `ollama/ollama:0.32.1`; **`num_ctx` 4096** with **`num_predict` 512**; **greedy decoding**
@@ -332,8 +326,7 @@ decoding parameters, and the retrieval top-k, pinned together for the online pat
   `make llm-pull` tag from the constant instead of duplicating the string.
 - **Why granite4:micro (verified live 2026-07-18):**
   - **Fits the 8 GB floor.** Q4_K_M ≈ 2.1 GB of weights plus the KV cache for a 4096-token
-    window fit the 8 GB budget with headroom — where the former 4 B model (3.9 GB served) went
-    swap-bound at 2.0–3.5 tok/s. This RAM fit, not raw speed, is the win.
+    window fit the 8 GB budget with headroom. This RAM fit, not raw speed, is the win.
   - **Strict license, verified.** Weights Apache-2.0 (model card, 2026-07-18), in the official
     Ollama library — no community re-uploads of unverifiable provenance.
   - **Plain instruct — no reasoning traces.** Granite-4.0-Micro emits no `<think>`/reasoning
@@ -359,12 +352,12 @@ decoding parameters, and the retrieval top-k, pinned together for the online pat
   + ≈ 1.6 s decode (≈ 58 s total). An abstention probe, `make ask Q="What is the capital of
   France?"`, correctly declined ("the excerpts provided do not contain any information about
   the capital of France … impossible to answer this question"). granite is **prefill-bound, not
-  swap-bound** (decode ≈ 7 tok/s vs the former model's swap-bound 2.0–3.5 on the same box) — the
+  swap-bound** (decode ≈ 7 tok/s) — the
   RAM fit that motivated the choice, confirmed. A pristine no-swap run on exact 4-core/8 GB
   hardware was not performed; the 4-core/8 GB is the design floor, justified by the ≈ 2.1 GB
   served footprint.
-- **Consequences:** the online path pins greedy, num_ctx 4096; `qwen3:4b-instruct` is removed
-  from the Ollama volume (`ollama rm`); the model download cost (≈ 2.1 GB) is stated in the
+- **Consequences:** the online path pins greedy, num_ctx 4096; the model download cost
+  (≈ 2.1 GB) is stated in the
   README quick start; if per-question latency on 8 GB is still too high, the next lever is the
   1 B tier (a smaller Granite/Llama), not further config — noted, not adopted.
 

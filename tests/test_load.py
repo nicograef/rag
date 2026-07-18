@@ -13,8 +13,8 @@ import psycopg
 import pytest
 from conftest import FakeEmbedder
 
-from rag.embed import EMBEDDING_DIM, embed_law
-from rag.load import LoadError, Row, join_law, main, read_records
+from rag.embed import EMBEDDING_DIM, embed_article
+from rag.load import LoadError, Row, join_article, main, read_records
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -30,17 +30,17 @@ def _generated_records(slug: str, tmp_path: Path) -> tuple[list[dict], list[dict
     """An article's chunk fixture plus dim-8 fake embeddings generated on the fly.
 
     tests/fixtures/embeddings/ only ships brentford and citypark goldens, so any other article
-    whose part we want to exercise gets its vectors from `embed_law` into `tmp_path` instead.
+    whose part we want to exercise gets its vectors from `embed_article` into `tmp_path` instead.
     """
     chunks_file = FIXTURES / "chunks" / f"{slug}.jsonl"
-    embeddings_file = embed_law(chunks_file, tmp_path, FakeEmbedder(dim=8))
+    embeddings_file = embed_article(chunks_file, tmp_path, FakeEmbedder(dim=8))
     return read_records(chunks_file), read_records(embeddings_file)
 
 
-def test_join_law_pairs_every_chunk_with_its_vector() -> None:
+def test_join_article_pairs_every_chunk_with_its_vector() -> None:
     chunks, embeddings = _fixture_records()
 
-    rows = join_law("brentford", chunks, embeddings, dim=8)
+    rows = join_article("brentford", chunks, embeddings, dim=8)
 
     assert [row.id for row in rows] == [chunk["id"] for chunk in chunks]
     for row, chunk in zip(rows, chunks, strict=True):
@@ -54,14 +54,14 @@ def test_a_chunk_without_an_embedding_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=f"without an embedding: {chunks[-1]['id']}"):
-        join_law("brentford", chunks, embeddings[:-1], dim=8)
+        join_article("brentford", chunks, embeddings[:-1], dim=8)
 
 
 def test_an_embedding_without_a_chunk_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=f"without a chunk: {chunks[-1]['id']}"):
-        join_law("brentford", chunks[:-1], embeddings, dim=8)
+        join_article("brentford", chunks[:-1], embeddings, dim=8)
 
 
 def test_model_disagreement_across_records_is_an_error() -> None:
@@ -69,14 +69,14 @@ def test_model_disagreement_across_records_is_an_error() -> None:
     embeddings[0]["model"] = "another-model"
 
     with pytest.raises(LoadError, match="disagree on model/dim"):
-        join_law("brentford", chunks, embeddings, dim=8)
+        join_article("brentford", chunks, embeddings, dim=8)
 
 
 def test_a_dim_not_matching_the_schema_is_an_error() -> None:
     chunks, embeddings = _fixture_records()
 
     with pytest.raises(LoadError, match=r"does not match the schema's vector\(16\)"):
-        join_law("brentford", chunks, embeddings, dim=16)
+        join_article("brentford", chunks, embeddings, dim=16)
 
 
 def test_a_chunk_record_missing_a_field_is_an_error() -> None:
@@ -84,7 +84,7 @@ def test_a_chunk_record_missing_a_field_is_an_error() -> None:
     del chunks[0]["citation"]
 
     with pytest.raises(LoadError, match="missing field 'citation'"):
-        join_law("brentford", chunks, embeddings, dim=8)
+        join_article("brentford", chunks, embeddings, dim=8)
 
 
 def test_an_embedding_record_missing_a_field_is_an_error() -> None:
@@ -92,21 +92,21 @@ def test_an_embedding_record_missing_a_field_is_an_error() -> None:
     del embeddings[0]["model"]
 
     with pytest.raises(LoadError, match="missing field 'model'"):
-        join_law("brentford", chunks, embeddings, dim=8)
+        join_article("brentford", chunks, embeddings, dim=8)
 
 
 def test_a_chunk_record_slug_not_matching_the_file_is_an_error() -> None:
     chunks, embeddings = _fixture_records()  # every record's slug is "brentford"
 
     with pytest.raises(LoadError, match="do not match the file"):
-        join_law("other", chunks, embeddings, dim=8)
+        join_article("other", chunks, embeddings, dim=8)
 
 
 def test_section_path_and_part_survive_the_join(tmp_path: Path) -> None:
     # citypark#History#1 carries a non-null part; section_path is empty for a top-level
     # Wikipedia section — both must reach the joined Row unchanged from the source chunk record.
     chunks, embeddings = _generated_records("citypark", tmp_path / "citypark")
-    by_id = {row.id: row for row in join_law("citypark", chunks, embeddings, dim=8)}
+    by_id = {row.id: row for row in join_article("citypark", chunks, embeddings, dim=8)}
 
     split = by_id["citypark#History#1"]
     assert split.part == {"index": 1, "total": 2}
@@ -163,7 +163,7 @@ def _write_artifacts(tmp_path: Path, slug: str = "brentford") -> tuple[Path, Pat
     source = FIXTURES / "chunks" / f"{slug}.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
     embeddings_dir = tmp_path / "embeddings"
-    embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    embed_article(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
     count = len(source.read_text(encoding="utf-8").splitlines())
     return chunks_dir, embeddings_dir, count
 
@@ -210,17 +210,17 @@ def test_rerunning_load_is_idempotent(test_db: psycopg.Connection, tmp_path: Pat
     # Change one chunk's text upstream and re-run: same row count, the row updated in place.
     chunks_file = chunks_dir / "brentford.jsonl"
     records = [json.loads(line) for line in chunks_file.read_text("utf-8").splitlines()]
-    records[0]["text"] = "Ein geänderter Text."
+    records[0]["text"] = "An edited text."
     chunks_file.write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8"
     )
-    embed_law(chunks_file, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    embed_article(chunks_file, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
 
     assert _run_load(chunks_dir, embeddings_dir) == 0
 
     assert test_db.execute("SELECT count(*) FROM chunks").fetchone() == (count,)
     row = test_db.execute("SELECT text FROM chunks WHERE id = %s", (records[0]["id"],)).fetchone()
-    assert row == ("Ein geänderter Text.",)
+    assert row == ("An edited text.",)
 
 
 @pytest.mark.integration
@@ -232,7 +232,7 @@ def test_a_removed_chunk_is_pruned_on_reload(test_db: psycopg.Connection, tmp_pa
     lines = chunks_file.read_text(encoding="utf-8").splitlines(keepends=True)
     removed_id = json.loads(lines[-1])["id"]
     chunks_file.write_text("".join(lines[:-1]), encoding="utf-8")
-    embed_law(chunks_file, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    embed_article(chunks_file, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
 
     assert _run_load(chunks_dir, embeddings_dir) == 0
 
@@ -250,7 +250,7 @@ def test_a_wrong_dimension_artifact_is_rejected(
     source = FIXTURES / "chunks" / "brentford.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
     embeddings_dir = tmp_path / "embeddings"
-    embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM + 1))
+    embed_article(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM + 1))
 
     assert _run_load(chunks_dir, embeddings_dir) == 1
 
@@ -286,7 +286,7 @@ def test_section_path_and_part_round_trip_through_the_database(
     embeddings_dir = tmp_path / "embeddings"
     source = FIXTURES / "chunks" / "citypark.jsonl"
     (chunks_dir / source.name).write_bytes(source.read_bytes())
-    embed_law(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
+    embed_article(chunks_dir / source.name, embeddings_dir, FakeEmbedder(dim=EMBEDDING_DIM))
 
     assert _run_load(chunks_dir, embeddings_dir) == 0
 

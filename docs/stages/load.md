@@ -47,7 +47,7 @@ Created idempotently on every run (`CREATE ... IF NOT EXISTS`), pinned by the
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS chunks (
     id text PRIMARY KEY,      -- chunk id — the upsert key
-    slug text, source_title text, unit text, section_path text[], citation text,
+    slug text, source_title text, section text, section_path text[], citation text,
     source_url text, fetched_at text,   -- filter/citation metadata, verbatim from chunk
     part jsonb NULL,
     text text,                -- what retrieval returns and the generator reads
@@ -57,8 +57,8 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_idx
     ON chunks USING hnsw (embedding vector_cosine_ops);
 ```
 
-`source_title` replaces the former law-specific column — the human-readable name of
-whatever the chunk came from (e.g. `Arsenal F.C.`), independent of the source's domain.
+`source_title` is the human-readable name of whatever the chunk came from
+(e.g. `Arsenal F.C.`), independent of the source's domain.
 One **HNSW index** with pgvector's default build parameters (`m=16`,
 `ef_construction=64`) and the cosine operator class — the distance operator everywhere is
 `<=>` (cosine distance), matching the model's normalized vectors. Why HNSW, and what the
