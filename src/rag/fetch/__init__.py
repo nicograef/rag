@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
     """Fetch every configured article; returns a non-zero exit code if any failed."""
     parser = argparse.ArgumentParser(
         prog="python -m rag.fetch",
-        description="Download Wikipedia article extracts via the MediaWiki Action API into data/raw/.",
+        description="Download Wikipedia article extracts via the MediaWiki API into data/raw/.",
     )
     parser.add_argument(
         "--config", type=Path, default=DEFAULT_CONFIG, help="corpus article list (TOML)"

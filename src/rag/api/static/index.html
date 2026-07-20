@@ -90,7 +90,7 @@
           autocomplete="off"
           autofocus
         />
-        <input id="top_k" type="number" min="1" value="5" title="how many chunks to retrieve" />
+        <input id="top_k" type="number" min="1" max="50" value="5" title="how many chunks to retrieve" />
         <button id="submit" type="submit">Ask</button>
       </form>
 
@@ -140,12 +140,9 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const d = data.detail;
-          const msg =
-            typeof d === "string"
-              ? d
-              : Array.isArray(d)
-                ? d.map((e) => e.msg).join("; ")
-                : `HTTP ${res.status}`;
+          let msg = `HTTP ${res.status}`;
+          if (typeof d === "string") msg = d;
+          else if (Array.isArray(d)) msg = d.map((e) => e.msg).join("; ");
           throw new Error(msg);
         }
         return data;
@@ -190,10 +187,7 @@
           li.append(a);
           sourcesEl.appendChild(li);
         }
-        noticeEl.textContent =
-          ask.sources.length > 0
-            ? "Excerpts from English Wikipedia, licensed CC BY-SA 4.0."
-            : "";
+        noticeEl.textContent = ask.licence;
         const st = ask.stats;
         statsEl.textContent =
           `${st.prompt_tokens} prompt + ${st.answer_tokens} answer tokens · ` +
@@ -206,7 +200,7 @@
         event.preventDefault();
         const question = questionEl.value.trim();
         if (!question) return;
-        const top_k = Math.max(1, parseInt(topKEl.value, 10) || 5);
+        const top_k = Math.min(50, Math.max(1, parseInt(topKEl.value, 10) || 5));
         const body = { question, top_k };
 
         submitEl.disabled = true;

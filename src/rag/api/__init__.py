@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from rag.ask import (
+    LICENCE_NOTICE,
     GenerateFn,
     RetrieveFn,
     answer_question,
@@ -47,9 +48,9 @@ MAX_TOP_K = 50
 
 
 class AskRequest(BaseModel):
-    """The shared ``/ask`` and ``/search`` request body: a question and how many chunks to retrieve."""
+    """The shared ``/ask``/``/search`` request body: a question and how many chunks to retrieve."""
 
-    question: str
+    question: str = Field(min_length=1)
     top_k: int = Field(default=TOP_K, ge=1, le=MAX_TOP_K)
 
 
@@ -74,7 +75,7 @@ class Hit(BaseModel):
 
 
 class GenerationStatsOut(BaseModel):
-    """The generation accounting, mirroring :class:`rag.generate.GenerationStats` field for field."""
+    """The generation accounting, mirroring :class:`rag.generate.GenerationStats` one-to-one."""
 
     prompt_tokens: int
     answer_tokens: int
@@ -99,10 +100,15 @@ class GenerationStatsOut(BaseModel):
 
 
 class AskResponse(BaseModel):
-    """The ``/ask`` response: the grounded answer, its numbered sources, and the run's stats."""
+    """The ``/ask`` response: the answer, its numbered sources, the licence notice, and stats.
+
+    ``licence`` carries :data:`rag.ask.LICENCE_NOTICE` so the UI displays exactly what the
+    attribution obligation requires — the wording lives in one place.
+    """
 
     answer: str
     sources: list[Source]
+    licence: str
     stats: GenerationStatsOut
 
 
@@ -210,6 +216,7 @@ def create_app(
                 )
                 for n, hit in enumerate(result.hits, start=1)
             ],
+            licence=LICENCE_NOTICE,
             stats=GenerationStatsOut.from_stats(result.stats),
         )
 

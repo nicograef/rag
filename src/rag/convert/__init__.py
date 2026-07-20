@@ -185,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     """Convert every fetched article; returns a non-zero exit code if any failed."""
     parser = argparse.ArgumentParser(
         prog="python -m rag.convert",
-        description="Convert fetched Wikipedia extracts from data/raw/ into Markdown under data/corpus/.",
+        description="Convert Wikipedia extracts from data/raw/ into Markdown under data/corpus/.",
     )
     parser.add_argument("--raw-dir", type=Path, default=RAW_DIR, help="input directory")
     parser.add_argument("--corpus-dir", type=Path, default=CORPUS_DIR, help="output directory")

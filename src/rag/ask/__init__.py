@@ -78,6 +78,14 @@ def _discard_delta(_delta: str) -> None:
     """Default ``on_delta`` for a non-streaming caller (the API): drop each token."""
 
 
+def _discard_hits(_hits: list[RetrievedChunk]) -> None:
+    """Default ``on_retrieved`` for a non-observing caller (the API): drop the hits."""
+
+
+def _discard_prompt(_prompt: Prompt) -> None:
+    """Default ``on_assembled`` for a non-observing caller (the API): drop the prompt."""
+
+
 def answer_question(
     question: str,
     top_k: int,
@@ -85,8 +93,8 @@ def answer_question(
     retrieve_fn: RetrieveFn,
     generate_fn: GenerateFn,
     on_delta: Callable[[str], None] = _discard_delta,
-    on_retrieved: Callable[[list[RetrievedChunk]], None] | None = None,
-    on_assembled: Callable[[Prompt], None] | None = None,
+    on_retrieved: Callable[[list[RetrievedChunk]], None] = _discard_hits,
+    on_assembled: Callable[[Prompt], None] = _discard_prompt,
 ) -> Answer:
     """Run retrieve → assemble → generate once and return the structured :class:`Answer`.
 
@@ -98,11 +106,9 @@ def answer_question(
     CLI passes all three (its live streaming and per-step stderr log); the API passes none.
     """
     hits = retrieve_fn(question, top_k)
-    if on_retrieved is not None:
-        on_retrieved(hits)
+    on_retrieved(hits)
     prompt = assemble(question, hits)
-    if on_assembled is not None:
-        on_assembled(prompt)
+    on_assembled(prompt)
     result = generate_fn(prompt, on_delta)
     return Answer(answer=result.answer, hits=list(hits), stats=result.stats)
 
@@ -150,7 +156,7 @@ def main(
     """
     parser = argparse.ArgumentParser(
         prog='python -m rag.ask "<question>"',
-        description="Answer a question about a football club from the retrieved Wikipedia excerpts.",
+        description="Answer a question about a football club from retrieved Wikipedia excerpts.",
     )
     parser.add_argument("question", help="the question to answer")
     parser.add_argument("--top-k", type=int, default=TOP_K, help="number of chunks to retrieve")

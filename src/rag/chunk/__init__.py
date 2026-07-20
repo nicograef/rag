@@ -323,11 +323,11 @@ def _split_body(body: str, heading: str, max_chars: int) -> list[SplitPart]:
         group: list[str] = []
         used = prefix_len
         while index < len(segments):
-            nxt = segments[index]
-            addition = (len(BLOCK_SEPARATOR) if group else 0) + len(nxt)
+            segment = segments[index]
+            addition = (len(BLOCK_SEPARATOR) if group else 0) + len(segment)
             if group and used + addition > max_chars:
                 break
-            group.append(nxt)
+            group.append(segment)
             used += addition
             index += 1
 

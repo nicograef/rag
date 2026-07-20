@@ -82,7 +82,7 @@ class GenerateResult:
 
 
 def ollama_base_url() -> str:
-    """``http://{OLLAMA_HOST:-localhost}:{OLLAMA_PORT:-11434}`` — mirrors connection_conninfo()."""
+    """``http://{OLLAMA_HOST:-localhost}:{OLLAMA_PORT:-11434}`` — mirrors connection_conninfo."""
     host = os.environ.get("OLLAMA_HOST", "localhost")
     port = os.environ.get("OLLAMA_PORT", "11434")
     return f"http://{host}:{port}"

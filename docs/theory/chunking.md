@@ -43,12 +43,12 @@ two do not track each other cleanly: dense, punctuation-heavy, or unusual text t
 more tokens per character than plain prose, so the same character count can land at very
 different token counts.
 
-That gap is why `max_chars` is now **load-bearing**, not slack. Phase 3 embeds with
-**bge-small-en-v1.5**, whose context window is **512 tokens** — down from the earlier
-model's 8192. A chunk longer than 512 tokens does not error on its own; the model simply
-**truncates** it and embeds the surviving head, silently dropping the chunk's tail from the
-vector. Under an 8192-token window a generous character cap left comfortable headroom; under
-512 it does not, so the cap has to be chosen to guarantee every chunk fits.
+That gap is why `max_chars` is **load-bearing**, not slack. Phase 3 embeds with
+**bge-small-en-v1.5**, whose context window is **512 tokens**. A chunk longer than 512
+tokens does not error on its own; the model simply **truncates** it and embeds the surviving
+head, silently dropping the chunk's tail from the vector. A 512-token window leaves a
+character cap no comfortable headroom, so the cap has to be chosen to guarantee every chunk
+fits.
 
 `max_chars` is therefore pinned to **1200 characters**, and the number is **validated, not
 guessed**. Measured over the fetched corpus with bge-small-en-v1.5's *own* tokenizer, the

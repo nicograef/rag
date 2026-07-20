@@ -24,7 +24,6 @@ __pycache__/
 # Raw downloads, converted corpus, embeddings, model files — never committed;
 # the pipeline is re-runnable (see docs/roadmap.md).
 data/
-*.gguf
 
 # ── Node (future frontend) ───────────────────────────────────────────────────
 node_modules/

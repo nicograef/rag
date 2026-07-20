@@ -51,7 +51,8 @@ distances) is the instrument that makes a retrieval improvement from (a) visible
 - **Routes**:
   - `GET /health` → `HealthResponse { status, model_loaded, database, ollama }` — model loaded?
     Postgres reachable? Ollama reachable? (live checks, short timeouts).
-  - `POST /ask` → `AskResponse { answer, sources: [Source], stats }` — the full RAG answer.
+  - `POST /ask` → `AskResponse { answer, sources: [Source], licence, stats }` — the full RAG
+    answer; `licence` carries the CC BY-SA notice the UI displays.
   - `POST /search` → `SearchResponse { hits: [Hit] }` — retrieval only, with `distance` + `text`.
   - `GET /` → the static `index.html` (Slice 2).
 - **Schemas** (Pydantic v2): `AskRequest { question, top_k=TOP_K }` — the shared `/ask` and

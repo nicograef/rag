@@ -7,9 +7,8 @@
 Embeds a question and returns the top-k nearest chunks from the vector store. First stage of
 the online path (**retrieve → assemble → generate**): it turns a natural-language question
 into ranked `RetrievedChunk` records that the assemble stage packs into a prompt. It reads
-the `chunks` table the [load stage](load.md) owns and never writes. It **supersedes the
-Phase 3 dev query command** (`rag.query`) — that tool was a thin retrieval spot-check, folded
-into this stage; the standalone CLI here keeps its output shape so `make query` still works.
+the `chunks` table the [load stage](load.md) owns and never writes. Its standalone CLI backs
+`make query`, the quick retrieval spot-check.
 
 ## Entry points
 

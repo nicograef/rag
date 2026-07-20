@@ -38,7 +38,8 @@ into one call, but the steps are worth seeing once:
    **English-only** — a fit for the English Wikipedia corpus. Models have a token limit, and an
    encoder left to itself silently truncates anything over it. This model's window is
    **512 tokens** — tight enough that chunk size is load-bearing rather than slack, which is
-   why the [chunking chapter](chunking.md#characters-versus-tokens) pins the character cap
+   why the [chunking chapter](chunking.md#characters-versus-tokens-why-the-size-cap-is-load-bearing-now)
+   pins the character cap
    by measuring real text through this very tokenizer. The [embed stage](../stages/embed.md)
    leans on no margin: a chunk over the window fails the article with an `EmbedError` naming
    it, never silently cut.

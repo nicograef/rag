@@ -163,8 +163,9 @@ streamed line before printing the error).
 
 ## Verification
 
-End-to-end spot-check (**2026-07-18**), on the **4-core / 8 GB** CPU-only floor, without
-swap: `make llm-pull` pulled `granite4:micro`, then `make ask Q="Which stadium does Arsenal
+End-to-end spot-check (**2026-07-18**), CPU-only on an **8-core / 5.7 GB** machine — a
+tighter RAM budget than the 4-core / 8 GB design floor — without swap: `make llm-pull`
+pulled `granite4:micro`, then `make ask Q="Which stadium does Arsenal
 play at?"` streamed a grounded, cited English answer —
 
 > "Arsenal plays at the Emirates Stadium [3]."
@@ -175,10 +176,12 @@ abstention probe, `make ask Q="What is the capital of France?"`, correctly decli
 > "the excerpts provided do not contain any information about the capital of France …
 > impossible to answer this question"
 
-**Honest reading.** Both runs stayed within the 4-core/8 GB floor without swap —
-prefill-bound, not swap-bound. This is a two-question spot-check, anecdotal by design — no
-thresholds, no metrics (the RAG triad and rank metrics are Backlog 1), and a directive is a
-request, not a guarantee (runtime groundedness checks are Backlog 9). Per-phase timings and
+**Honest reading.** Both runs stayed within a RAM budget tighter than the 8 GB floor,
+without swap — prefill-bound, not swap-bound; a run on exact 4-core/8 GB hardware was not
+performed (the floor is the design target, argued from the ≈ 2.1 GB served footprint). This
+is a two-question spot-check, anecdotal by design — no thresholds, no metrics (the RAG triad
+and rank metrics are Backlog 1), and a directive is a request, not a guarantee (runtime
+groundedness checks are Backlog 9). Per-phase timings and
 the full memory picture live in the [generation-model decision](../roadmap.md#decisions).
 
 ## Downstream consumers

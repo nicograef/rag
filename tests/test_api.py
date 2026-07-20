@@ -12,6 +12,7 @@ from conftest import FakeEmbedder
 from fastapi.testclient import TestClient
 
 from rag.api import create_app
+from rag.ask import LICENCE_NOTICE
 from rag.generate import GenerateError, GenerateResult, GenerationStats
 from rag.retrieve import RetrievedChunk, RetrieveError
 
@@ -121,6 +122,7 @@ def test_ask_returns_answer_numbered_sources_and_stats() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["answer"] == ANSWER
+    assert body["licence"] == LICENCE_NOTICE
     assert body["sources"] == [
         {
             "n": 1,
@@ -163,6 +165,13 @@ def test_ask_rejects_top_k_over_the_cap_with_422() -> None:
         response = client.post("/ask", json={"question": "q", "top_k": MAX_TOP_K + 1})
 
     assert response.status_code == 422  # Pydantic le=MAX_TOP_K, before any stage runs
+
+
+def test_ask_rejects_an_empty_question_with_422() -> None:
+    with _client() as client:
+        response = client.post("/ask", json={"question": ""})
+
+    assert response.status_code == 422  # Pydantic min_length=1, before any stage runs
 
 
 def test_ask_retrieve_error_maps_to_503() -> None:

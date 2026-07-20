@@ -43,7 +43,8 @@ in the [roadmap](docs/roadmap.md).
 > (**assemble**, **generate** on `granite4:micro`). A full `make fetch` → `make load` run indexed
 > 1,333 chunks, and `make ask "Which stadium does Arsenal play at?"` answers *"Arsenal plays at
 > the Emirates Stadium"* with a numbered `Sources:` block and a CC BY-SA notice — re-verified from
-> a clean checkout on the 4-core/8 GB floor.
+> a clean checkout, CPU-only, on an 8-core/5.7 GB machine (a tighter RAM budget than the
+> 4-core/8 GB design floor).
 
 ## Quick start
 

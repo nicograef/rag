@@ -2,8 +2,8 @@
 
 ``ask.main`` wires retrieve → assemble → generate. The tests inject fake ``retrieve_fn`` and
 ``generate_fn`` so the flow runs offline, and pin the two contracts a caller depends on: the
-stdout shape (streamed answer, blank line, numbered ``Sources:`` block, licence notice) and the one-line-per-
-step stderr log. ``assemble`` is exercised for real — it is a pure function.
+stdout shape (streamed answer, blank line, numbered ``Sources:`` block, licence notice) and
+the one-line-per-step stderr log. ``assemble`` is exercised for real — it is a pure function.
 """
 
 import pytest

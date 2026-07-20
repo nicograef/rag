@@ -115,8 +115,8 @@ an over-budget prompt is a loud `AssembleError`, not a silently shortened one.
 Characters stand in for tokens because the prompt is built from characters while the model
 reasons in tokens, and exact token counting with the served tokenizer is deferred (Backlog 7).
 The floor is measured, not guessed — the same characters-versus-tokens argument the
-[chunking chapter](chunking.md#characters-versus-tokens) makes for the chunk-size cap, applied
-again to the prompt cap. The pinned floor and the derived character cap live in the
+[chunking chapter](chunking.md#characters-versus-tokens-why-the-size-cap-is-load-bearing-now)
+makes for the chunk-size cap, applied again to the prompt cap. The pinned floor and the derived character cap live in the
 [assemble contract](../stages/assemble.md) and
 [`src/rag/assemble/`](../../src/rag/assemble/__init__.py).
 

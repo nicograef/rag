@@ -45,6 +45,7 @@ All commands via Makefile in the project root (`make help` for the full list).
 | `make load`     | Load chunks + embeddings into Postgres/pgvector (needs `make db`) |
 | `make query`    | Verify retrieval via the retrieve stage: `make query Q="<question>"` |
 | `make ask`      | Ask a question end to end: `make ask Q="<question>"` (retrieve → assemble → generate) |
+| `make serve`    | Start the learner web app (FastAPI + static UI) |
 | `make llm`      | Start the Ollama LLM service (Docker Compose)  |
 | `make llm-pull` | Pull the pinned LLM into the Ollama model volume |
 | `make check`    | Lint + types + tests (run before claiming work done) |

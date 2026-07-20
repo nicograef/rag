@@ -5,8 +5,8 @@ stage used on the corpus — the deliberate query-document coupling, since a nea
 search is only meaningful when query and documents live in one vector space (recorded in the
 model decision). Runs one similarity query against the ``chunks`` table the load stage owns,
 ordered by the pinned distance operator, and returns ``RetrievedChunk`` records — the
-downstream contract the assemble and ask stages consume. Supersedes the Phase 3 dev query
-command; the standalone CLI keeps that tool's output shape so ``make query`` still works.
+downstream contract the assemble and ask stages consume. The standalone CLI backs
+``make query``, the quick retrieval spot-check.
 
 Stage contract: docs/stages/retrieve.md
 Theory: docs/theory/embeddings.md, docs/theory/vector-indexes.md
@@ -30,6 +30,9 @@ TOP_K = 5
 
 # The standalone CLI flattens each hit's text to a one-line snippet of this width.
 SNIPPET_CHARS = 200
+
+# A missing vector type and a missing table both mean load never ran — one shared hint.
+NO_CHUNKS_TABLE_HINT = "no chunks table — run `make load` first"
 
 
 class RetrieveError(Exception):
@@ -79,7 +82,7 @@ def retrieve(question: str, *, embedder: Embedder, top_k: int = TOP_K) -> list[R
             except psycopg.ProgrammingError as error:
                 # No vector type in the database means load never ran (it owns
                 # CREATE EXTENSION) — same situation as a missing table, same hint.
-                raise RetrieveError("no chunks table — run `make load` first") from error
+                raise RetrieveError(NO_CHUNKS_TABLE_HINT) from error
             try:
                 rows = connection.execute(
                     f"""
@@ -92,7 +95,7 @@ def retrieve(question: str, *, embedder: Embedder, top_k: int = TOP_K) -> list[R
                     {"question": Vector(embedding), "top_k": top_k},
                 ).fetchall()
             except psycopg.errors.UndefinedTable as error:
-                raise RetrieveError("no chunks table — run `make load` first") from error
+                raise RetrieveError(NO_CHUNKS_TABLE_HINT) from error
     except psycopg.OperationalError as error:
         raise RetrieveError(f"database connection failed: {error} — run `make db` first") from error
 

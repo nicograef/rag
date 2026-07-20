@@ -30,7 +30,7 @@ class Prompt:
 
     @property
     def char_count(self) -> int:
-        """Prompt size in characters — the one definition the budget check and the ask log share."""
+        """Prompt size in characters — the one definition the budget check and ask log share."""
         return len(self.system) + len(self.user)
 
 
