@@ -139,6 +139,13 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 - 🚫 **Never:** commit anything under `data/`, secrets, or credentials.
 - 🚫 **Never:** ingest sources with unclear licensing.
 
+## Communication
+
+- **Lead with the answer or the problem.** No preamble, no restating the question, no closing recap.
+- **Never open with praise.** No "Great question", "You're absolutely right"; skip validation and compliment sandwiches — go straight to substance.
+- **Critical by default.** Name weaknesses, risks, and simpler alternatives unprompted. If the developer is wrong, say so explicitly with evidence — "this is wrong because X", not "you might want to consider".
+- **Objective and honest.** Separate fact from inference from guess and label them; "I don't know" beats polite hedging. Shortest complete answer wins.
+
 ## Quality Principles
 
 - **Correctness and simplicity are decisive; effort is never a counter-argument.** Correctness, simplicity, code quality, and consistency decide every change; effort, time, and work volume are deliberately subordinate — never a valid argument against the correct, simple, clean solution. "Work volume" means effort, not scope: the scope guard below stays — no unrequested features, no gold-plating.
