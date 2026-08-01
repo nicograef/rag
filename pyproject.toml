@@ -5,11 +5,11 @@ description = "Learning project: a RAG system over English Wikipedia, built from
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.139.2",
+    "fastapi>=0.140.13",
     "httpx>=0.28.1",
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
-    "sentence-transformers>=5.6.0",
+    "sentence-transformers>=5.6.1",
     # Direct dependency only so the CPU-only index pin below applies (uv sources
     # don't reach transitive packages); imported via sentence-transformers.
     "torch>=2.13.0",
@@ -19,8 +19,8 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8",
-    "ruff>=0.9",
-    "ty>=0.0.59",
+    "ruff>=0.16.0",
+    "ty>=0.0.64",
 ]
 
 # CPU-only torch: the playbook is CPU-only by design; the default PyPI wheels bundle
