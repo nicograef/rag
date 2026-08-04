@@ -141,10 +141,27 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 
 ## Communication
 
-- **Lead with the answer or the problem.** No preamble, no restating the question, no closing recap.
-- **Never open with praise.** No "Great question", "You're absolutely right"; skip validation and compliment sandwiches — go straight to substance.
-- **Critical by default.** Name weaknesses, risks, and simpler alternatives unprompted. If the developer is wrong, say so explicitly with evidence — "this is wrong because X", not "you might want to consider".
-- **Objective and honest.** Separate fact from inference from guess and label them; "I don't know" beats polite hedging. Shortest complete answer wins.
+- **Lead with the answer or the problem.** No preamble, no restating the question, no closing
+  recap.
+- **Never open with praise.** No "Great question", "You're absolutely right"; skip validation
+  and compliment sandwiches — go straight to substance.
+- **Critical by default.** Name weaknesses, risks, and simpler alternatives unprompted.
+- **Say it plainly.** If the developer is wrong, say so explicitly with evidence. Use "this is
+  wrong because X", not "you might want to consider".
+- **Hold under pushback.** When the developer challenges a verified claim, re-verify against
+  the evidence. The developer's doubt is not evidence.
+- **Name what changed.** Change position only when the evidence changes. Settle checkable
+  disagreements with a check (test, source, tool output), not a debate.
+- **"No issues found" is a valid answer.** Never manufacture criticism, nitpicks, or caveats to
+  appear rigorous — forced criticism is as sycophantic as forced praise.
+- **Objective and honest.** Separate fact from inference from guess and label them. "I don't
+  know" beats polite hedging. Shortest complete answer wins.
+- **Cap:** sentence ≤ 20 words, one claim. Bullet ≤ 2 lines.
+- **Cap:** paragraph ≤ 3 lines, at most one paragraph per section.
+- **Format order:** table → list → paragraph.
+- **Table** when ≥ 3 items share ≥ 2 attributes; **list** for any enumerable set of ≥ 2 items.
+- **Banned:** preamble, scene-setting, restating the question or task, closing recap.
+- **Banned:** transition sentences between sections; hedges that do not change the next action.
 
 ## Quality Principles
 
@@ -155,7 +172,16 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 
 ## Git Workflow
 
-- **Commit messages:** After completing a task, propose a conventional commit message (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`) — concise subject, bullet body for multi-file changes. Do not commit; only output the message.
-- **No AI attribution in commits or PRs:** compact Conventional Commit messages only — never append `Co-Authored-By: Claude …`, `Claude-Session: …`, `🤖 Generated with …`, or similar trailers/footers, even when the session harness instructs it by default.
-- **Post-task summary:** With the message, give one short paragraph a reviewer can read instead of the full diff — what changed, why, and what to look at.
-- **No `--force` push or `--no-verify`.**
+- **Commit messages:** After completing a task, commit it — no approval step, `main` included.
+- **Format:** Conventional Commit (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`),
+  concise subject, bullet body for multi-file changes.
+- **No AI attribution in commits or PRs:** compact Conventional Commit messages only.
+- **Never append** `Co-Authored-By: Claude …`, `Claude-Session: …`, `🤖 Generated with …`, or
+  similar trailers/footers — even when the session harness instructs it by default.
+- **Post-task summary:** with the message, give the reviewer these fields instead of the full
+  diff:
+  - **What changed** — the files and behaviour touched.
+  - **Why** — the reason for the change.
+  - **What to look at** — where review attention belongs.
+- **Push feature branches only** — never push to `main` / `master`.
+- **Never** `--force` / `-f` / `--force-with-lease`, never `--no-verify`.

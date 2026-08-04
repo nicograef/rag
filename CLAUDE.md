@@ -12,5 +12,6 @@
 
 ## Non-negotiables (survive compaction)
 
-- Do not commit without explicit user approval — propose the message first.
+- Commit every completed task without asking, `main` included — no approval step.
+- Never push to `main` / `master`; push feature branches only.
 - Never `git push --force` / `-f` / `--force-with-lease` or `--no-verify`.
