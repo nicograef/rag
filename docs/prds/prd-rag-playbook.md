@@ -219,7 +219,7 @@ learner's own corpus actually requires.
 - Documentation verification is a manual review-checklist item — links and referenced
   paths must exist when a change lands; no link-checker tooling is built under this PRD.
 - The quick start is verified from a clean checkout each time a phase lands, and the
-  verification date is recorded with the README status. Between phases, external
+  README status records the result. Between phases, external
   dependencies (the Wikipedia API, model hosting) can rot; the support policy states
   this explicitly.
 - Prior art: the existing smoke test (import + version) establishes the pattern of testing
