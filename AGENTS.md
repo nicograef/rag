@@ -99,7 +99,7 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 5. **One feature at a time** — follow [docs/roadmap.md](docs/roadmap.md) phase by phase;
    never skip ahead or bundle phases. **Definition of done** for every future roadmap
    phase: code + tests + theory chapter + documented stage contract + updated README
-   status with verification date. A phase is not complete until all five have landed.
+   status. A phase is not complete until all five have landed.
 6. **No RAG frameworks** (LangChain, LlamaIndex, Haystack). Build the primitives by hand
    from plain libraries — the goal is learning how RAG works internally.
 7. **No data artifacts in git.** `data/` is gitignored; every pipeline stage must be
@@ -123,17 +123,20 @@ pipeline records; ruff defaults (4-space indent, 100-char lines).
 - **Small increments.** Prefer several reviewable steps over one big drop; the developer
   reads every diff to learn from it.
 - **Simple over clever.** Explicit code beats abstractions; no premature generality.
-- **Prune, don't archive.** When a decision or doc is superseded, rewrite it in place to the
-  state that now holds — never leave the stale version beside its replacement as dated
-  history. The public playbook reads as what is true today; only dated *verification* stamps
-  of live facts persist (the rule prunes superseded content, not the verify-before-claiming
-  discipline).
+- **Current state only** — docs, comments and instructions describe what is true now.
+  - The public playbook reads as what is true today.
+  - Git history is the archive, and the only record of a prior state.
+  - A change that makes a statement false rewrites or deletes it in the same change.
+  - A superseded version never stands beside its replacement.
+  - Banned in prose: dated change entries, "previously / formerly / used to", deprecation notes.
+  - Exceptions: `CHANGELOG.md`, ADR files, git history.
+  - **Delete, don't deprecate** — a redundant file is deleted, with every reference removed.
 
 ## Boundaries
 
 - ✅ **Always:** Verify before claiming — search the codebase before making assertions about existing code, structure, or behaviour. Never guess what a file contains or how something works — read the actual source.
 - ✅ **Always:** Ask instead of assuming — when uncertain about requirements, design intent, or user expectations, ask structured questions to clarify. Only proceed with documented assumptions if the user explicitly declines to answer.
-- ✅ **Always:** Verify trained knowledge — before relying on trained knowledge of any kind (external tools, libraries, specs, model choices, versions, prices, dates), verify it against current authoritative public sources (official docs, model cards, papers, primary sources); never assert time-sensitive facts from memory, and date every time-sensitive claim.
+- ✅ **Always:** Verify trained knowledge — before relying on trained knowledge of any kind (external tools, libraries, specs, model choices, versions, prices, dates), verify it against current authoritative public sources (official docs, model cards, papers, primary sources); never assert time-sensitive facts from memory.
 - ✅ **Always:** Run `make check` before reporting work complete and cite the result.
 - ⚠️ **Ask first:** new dependencies, changes to Docker/Compose config, adding a new corpus source.
 - 🚫 **Never:** commit anything under `data/`, secrets, or credentials.
